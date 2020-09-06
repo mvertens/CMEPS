@@ -511,6 +511,7 @@ contains
             factorList=factorList, &
             ignoreDegenerate=.true., &
             unmappedaction=ESMF_UNMAPPEDACTION_IGNORE, rc=rc)
+       if (chkerr(rc,__LINE__,u_FILE_u)) return
     end if
 
     if (dbug_flag > 1) then
