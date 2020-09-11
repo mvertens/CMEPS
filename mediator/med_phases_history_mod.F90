@@ -57,17 +57,35 @@ module med_phases_history_mod
   implicit none
   private
 
+  ! Public routine called from med.F90
   public :: med_phases_history_init
-  public :: med_phases_history_write
-  public :: med_phases_history_write_med
-  public :: med_phases_history_write_atm
-  public :: med_phases_history_write_ice
-  public :: med_phases_history_write_glc
-  public :: med_phases_history_write_lnd
-  public :: med_phases_history_write_ocn
-  public :: med_phases_history_write_rof
-  public :: med_phases_history_write_wav
 
+  ! Public routines called from the run sequence
+  public :: med_phases_history_write_all_inst
+  public :: med_phases_history_write_med_inst
+  public :: med_phases_history_write_atm_inst
+  public :: med_phases_history_write_atm_avg
+  public :: med_phases_history_write_atm_aux
+  public :: med_phases_history_write_ice_inst
+  public :: med_phases_history_write_ice_avg
+  public :: med_phases_history_write_ice_aux
+  public :: med_phases_history_write_glc_inst
+  public :: med_phases_history_write_glc_avg
+  public :: med_phases_history_write_glc_aux
+  public :: med_phases_history_write_lnd_inst
+  public :: med_phases_history_write_lnd_avg
+  public :: med_phases_history_write_lnd_aux
+  public :: med_phases_history_write_ocn_inst
+  public :: med_phases_history_write_ocn_avg
+  public :: med_phases_history_write_ocn_aux
+  public :: med_phases_history_write_rof_inst
+  public :: med_phases_history_write_rof_avg
+  public :: med_phases_history_write_rof_aux
+  public :: med_phases_history_write_wav_inst
+  public :: med_phases_history_write_wav_avg
+  public :: med_phases_history_write_wav_aux
+
+  ! Private routines
   private :: med_phases_history_write_hfile
   private :: med_phases_history_write_hfileaux
   private :: med_phases_history_get_filename
@@ -105,8 +123,7 @@ module med_phases_history_mod
   character(CL) :: case_name  ! case name
   character(CS) :: inst_tag   ! instance tag
 
-  logical :: debug_alarms = .true.
-
+  logical       :: debug_alarms = .false.
   character(*), parameter :: u_FILE_u  = &
        __FILE__
 
@@ -151,6 +168,7 @@ contains
     logical                     :: found         ! temporary logical
     integer                     :: fieldcount
     character(CS), allocatable  :: fieldNameList(:)
+    integer                     :: nfld
     character(len=*), parameter :: subname=' (med_phases_history_init)'
     !---------------------------------------
 
@@ -409,6 +427,14 @@ contains
                 ! Deallocate memory from fieldnamelist
                 deallocate(fieldnamelist) ! this was allocated in med_phases_history_get_auxflds
              end if
+             if (mastertask) then
+                write(logunit,*)
+                write(logunit,'(a,i4,a)') trim(subname)//' Outputing the following fields to auxfile ',nfcnt,&
+                     ' for component '//trim(compname(ncomp))
+                do nfld = 1,size(auxfiles(ncomp,nfcnt)%flds)
+                   write(logunit,'(4x,a)') trim(auxfiles(ncomp,nfcnt)%flds(nfld))
+                end do
+             end if
 
              ! Create FBaccum if averaging is on
              if (auxfiles(ncomp,nfcnt)%useavg) then
@@ -499,12 +525,11 @@ contains
   end subroutine med_phases_history_init
 
   !===============================================================================
-  subroutine med_phases_history_write(gcomp, rc)
+  subroutine med_phases_history_write_all_inst(gcomp, rc)
     ! --------------------------------------
     ! Write mediator history file for all variables
     ! This is a phase called by the run sequence
     ! --------------------------------------
-
     ! input/output variables
     type(ESMF_GridComp)  :: gcomp
     integer, intent(out) :: rc
@@ -513,23 +538,17 @@ contains
     character(len=*), parameter :: subname='(med_phases_history_write)'
     !---------------------------------------
     rc = ESMF_SUCCESS
-
     call t_startf('MED:'//subname)
     call med_phases_history_write_hfile(gcomp, 'all', 'alarm_history_inst_all', .false., rc)
     if (ChkErr(rc,__LINE__,u_FILE_u)) return
-    call med_phases_history_write_hfile(gcomp, 'all', 'alarm_history_avg_all', .true., rc)
-    if (ChkErr(rc,__LINE__,u_FILE_u)) return
     call t_stopf('MED:'//subname)
-
-  end subroutine med_phases_history_write
+  end subroutine med_phases_history_write_all_inst
 
   !===============================================================================
-  subroutine med_phases_history_write_med(gcomp, rc)
-    ! --------------------------------------
+  subroutine med_phases_history_write_med_inst(gcomp, rc)
     ! Write mediator history file for med variables - only instantaneous files are written
     ! This writes out ocean albedoes and atm/ocean fluxes computed by the mediator
     ! along with the fractions computed by the mediator
-    ! --------------------------------------
 
     ! input/output variables
     type(ESMF_GridComp)  :: gcomp
@@ -539,203 +558,356 @@ contains
     character(len=*), parameter :: subname='(med_phases_history_write_med)'
     !---------------------------------------
     rc = ESMF_SUCCESS
-
     call t_startf('MED:'//subname)
     call med_phases_history_write_hfile(gcomp, 'med', 'alarm_history_inst_med', .false., rc)
     if (ChkErr(rc,__LINE__,u_FILE_u)) return
     call t_stopf('MED:'//subname)
-
-  end subroutine med_phases_history_write_med
+  end subroutine med_phases_history_write_med_inst
 
   !===============================================================================
-  subroutine med_phases_history_write_atm(gcomp, rc)
-    ! --------------------------------------
+  subroutine med_phases_history_write_atm_inst(gcomp, rc)
     ! Write mediator history file for atm variables
-    ! --------------------------------------
-
     ! input/output variables
     type(ESMF_GridComp)  :: gcomp
     integer, intent(out) :: rc
+    ! local variables
+    integer :: n
+    character(len=*), parameter :: subname='(med_phases_history_write_atm_inst)'
+    !---------------------------------------
+    rc = ESMF_SUCCESS
+    call t_startf('MED:'//subname)
+    call med_phases_history_write_hfile(gcomp, 'atm', 'alarm_history_inst_atm', .false., rc)
+    if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    call t_stopf('MED:'//subname)
+  end subroutine med_phases_history_write_atm_inst
 
+  subroutine med_phases_history_write_atm_avg(gcomp, rc)
+    ! Write mediator history file for atm variables
+    ! input/output variables
+    type(ESMF_GridComp)  :: gcomp
+    integer, intent(out) :: rc
+    ! local variables
+    integer :: n
+    character(len=*), parameter :: subname='(med_phases_history_write_atm_avg)'
+    !---------------------------------------
+    rc = ESMF_SUCCESS
+    call t_startf('MED:'//subname)
+    call med_phases_history_write_hfile(gcomp, 'atm', 'alarm_history_avg_atm', .true., rc)
+    if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    call t_stopf('MED:'//subname)
+  end subroutine med_phases_history_write_atm_avg
+
+  subroutine med_phases_history_write_atm_aux(gcomp, rc)
+    ! Write mediator history file for atm variables
+    ! input/output variables
+    type(ESMF_GridComp)  :: gcomp
+    integer, intent(out) :: rc
     ! local variables
     integer :: n
     character(len=*), parameter :: subname='(med_phases_history_write_atm)'
     !---------------------------------------
     rc = ESMF_SUCCESS
     call t_startf('MED:'//subname)
-    call med_phases_history_write_hfile(gcomp, 'atm', 'alarm_history_inst_atm', .false., rc)
-    if (ChkErr(rc,__LINE__,u_FILE_u)) return
-    call med_phases_history_write_hfile(gcomp, 'atm', 'alarm_history_avg_atm', .true., rc)
-    if (ChkErr(rc,__LINE__,u_FILE_u)) return
     do n = 1,num_auxfiles(compatm)
        call med_phases_history_write_hfileaux(gcomp, case_name, inst_tag, n, compatm, auxfiles(compatm,n), rc=rc)
        if (ChkErr(rc,__LINE__,u_FILE_u)) return
     end do
     call t_stopf('MED:'//subname)
-  end subroutine med_phases_history_write_atm
+  end subroutine med_phases_history_write_atm_aux
 
   !===============================================================================
-  subroutine med_phases_history_write_ice(gcomp, rc)
-    ! --------------------------------------
+  subroutine med_phases_history_write_ice_inst(gcomp, rc)
     ! Write mediator history file for ice variables
-    ! --------------------------------------
-
     ! input/output variables
     type(ESMF_GridComp)  :: gcomp
     integer, intent(out) :: rc
+    ! local variables
+    character(len=*), parameter :: subname='(med_phases_history_write_ice_inst)'
+    !---------------------------------------
+    rc = ESMF_SUCCESS
+    call t_startf('MED:'//subname)
+    call med_phases_history_write_hfile(gcomp, 'ice', 'alarm_history_inst_ice', .false., rc)
+    if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    call t_stopf('MED:'//subname)
+  end subroutine med_phases_history_write_ice_inst
 
+  subroutine med_phases_history_write_ice_avg(gcomp, rc)
+    ! Write mediator history file for ice variables
+    ! input/output variables
+    type(ESMF_GridComp)  :: gcomp
+    integer, intent(out) :: rc
+    ! local variables
+    character(len=*), parameter :: subname='(med_phases_history_write_ice_avg)'
+    !---------------------------------------
+    rc = ESMF_SUCCESS
+    call t_startf('MED:'//subname)
+    call med_phases_history_write_hfile(gcomp, 'ice', 'alarm_history_avg_ice', .true., rc)
+    if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    call t_stopf('MED:'//subname)
+  end subroutine med_phases_history_write_ice_avg
+
+  subroutine med_phases_history_write_ice_aux(gcomp, rc)
+    ! Write mediator history file for ice variables
+    ! input/output variables
+    type(ESMF_GridComp)  :: gcomp
+    integer, intent(out) :: rc
     ! local variables
     integer :: n
     character(len=*), parameter :: subname='(med_phases_history_write_ice)'
     !---------------------------------------
     rc = ESMF_SUCCESS
     call t_startf('MED:'//subname)
-    call med_phases_history_write_hfile(gcomp, 'ice', 'alarm_history_inst_ice', .false., rc)
-    if (ChkErr(rc,__LINE__,u_FILE_u)) return
-    call med_phases_history_write_hfile(gcomp, 'ice', 'alarm_history_avg_ice', .true., rc)
-    if (ChkErr(rc,__LINE__,u_FILE_u)) return
     do n = 1,num_auxfiles(compice)
        call med_phases_history_write_hfileaux(gcomp, case_name, inst_tag, n, compice, auxfiles(compice,n), rc=rc)
        if (ChkErr(rc,__LINE__,u_FILE_u)) return
     end do
     call t_stopf('MED:'//subname)
-
-  end subroutine med_phases_history_write_ice
+  end subroutine med_phases_history_write_ice_aux
 
   !===============================================================================
-  subroutine med_phases_history_write_glc(gcomp, rc)
-    ! --------------------------------------
+  subroutine med_phases_history_write_glc_inst(gcomp, rc)
     ! Write mediator history file for glc variables
-    ! --------------------------------------
-
     ! input/output variables
     type(ESMF_GridComp)  :: gcomp
     integer, intent(out) :: rc
+    ! local variables
+    integer :: n
+    character(len=*), parameter :: subname='(med_phases_history_write_glc_inst)'
+    !---------------------------------------
+    rc = ESMF_SUCCESS
+    call t_startf('MED:'//subname)
+    call med_phases_history_write_hfile(gcomp, 'glc', 'alarm_history_inst_glc', .false., rc)
+    call t_stopf('MED:'//subname)
+  end subroutine med_phases_history_write_glc_inst
 
+  subroutine med_phases_history_write_glc_avg(gcomp, rc)
+    ! Write mediator history file for glc variables
+    ! input/output variables
+    type(ESMF_GridComp)  :: gcomp
+    integer, intent(out) :: rc
+    ! local variables
+    character(len=*), parameter :: subname='(med_phases_history_write_glc_avg)'
+    !---------------------------------------
+    rc = ESMF_SUCCESS
+    call t_startf('MED:'//subname)
+    call med_phases_history_write_hfile(gcomp, 'glc', 'alarm_history_avg_glc', .true., rc)
+    if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    call t_stopf('MED:'//subname)
+  end subroutine med_phases_history_write_glc_avg
+
+  subroutine med_phases_history_write_glc_aux(gcomp, rc)
+    ! Write mediator history file for glc variables
+    ! input/output variables
+    type(ESMF_GridComp)  :: gcomp
+    integer, intent(out) :: rc
     ! local variables
     integer :: n
     character(len=*), parameter :: subname='(med_phases_history_write_glc)'
     !---------------------------------------
     rc = ESMF_SUCCESS
     call t_startf('MED:'//subname)
-    call med_phases_history_write_hfile(gcomp, 'glc', 'alarm_history_inst_glc', .false., rc)
-    if (ChkErr(rc,__LINE__,u_FILE_u)) return
-    call med_phases_history_write_hfile(gcomp, 'glc', 'alarm_history_avg_glc', .true., rc)
-    if (ChkErr(rc,__LINE__,u_FILE_u)) return
     do n = 1,num_auxfiles(compglc)
        call med_phases_history_write_hfileaux(gcomp, case_name, inst_tag, n, compglc, auxfiles(compglc,n), rc=rc)
        if (ChkErr(rc,__LINE__,u_FILE_u)) return
     end do
     call t_stopf('MED:'//subname)
-  end subroutine med_phases_history_write_glc
+  end subroutine med_phases_history_write_glc_aux
 
   !===============================================================================
-  subroutine med_phases_history_write_lnd(gcomp, rc)
-    ! --------------------------------------
+  subroutine med_phases_history_write_lnd_inst(gcomp, rc)
     ! Write mediator history file for lnd variables
-    ! --------------------------------------
-
     ! input/output variables
     type(ESMF_GridComp)  :: gcomp
     integer, intent(out) :: rc
-
     ! local variables
-    integer :: n
-    character(len=*), parameter :: subname='(med_phases_history_write_lnd)'
+    character(len=*), parameter :: subname='(med_phases_history_write_lnd_inst)'
     !---------------------------------------
     rc = ESMF_SUCCESS
     call t_startf('MED:'//subname)
     call med_phases_history_write_hfile(gcomp, 'lnd', 'alarm_history_inst_lnd', .false., rc)
     if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    call t_stopf('MED:'//subname)
+  end subroutine med_phases_history_write_lnd_inst
+
+  subroutine med_phases_history_write_lnd_avg(gcomp, rc)
+    ! Write mediator history file for lnd variables
+    ! input/output variables
+    type(ESMF_GridComp)  :: gcomp
+    integer, intent(out) :: rc
+    ! local variables
+    character(len=*), parameter :: subname='(med_phases_history_write_lnd_avg)'
+    !---------------------------------------
+    rc = ESMF_SUCCESS
+    call t_startf('MED:'//subname)
     call med_phases_history_write_hfile(gcomp, 'lnd', 'alarm_history_avg_lnd', .true., rc)
     if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    call t_stopf('MED:'//subname)
+  end subroutine med_phases_history_write_lnd_avg
+
+  subroutine med_phases_history_write_lnd_aux(gcomp, rc)
+    ! Write mediator history file for lnd variables
+    ! input/output variables
+    type(ESMF_GridComp)  :: gcomp
+    integer, intent(out) :: rc
+    ! local variables
+    integer :: n
+    character(len=*), parameter :: subname='(med_phases_history_write_lnd_aux)'
+    !---------------------------------------
+    rc = ESMF_SUCCESS
+    call t_startf('MED:'//subname)
     do n = 1,num_auxfiles(complnd)
        call med_phases_history_write_hfileaux(gcomp, case_name, inst_tag, n, complnd, auxfiles(complnd,n), rc=rc)
        if (ChkErr(rc,__LINE__,u_FILE_u)) return
     end do
     call t_stopf('MED:'//subname)
-  end subroutine med_phases_history_write_lnd
+  end subroutine med_phases_history_write_lnd_aux
 
   !===============================================================================
-  subroutine med_phases_history_write_ocn(gcomp, rc)
-    ! --------------------------------------
+  subroutine med_phases_history_write_ocn_inst(gcomp, rc)
     ! Write mediator history file for ocn variables
-    ! --------------------------------------
-
     ! input/output variables
     type(ESMF_GridComp)  :: gcomp
     integer, intent(out) :: rc
-
     ! local variables
-    integer :: n
-    character(len=*), parameter :: subname='(med_phases_history_write_ocn)'
+    character(len=*), parameter :: subname='(med_phases_history_write_ocn_inst)'
     !---------------------------------------
     rc = ESMF_SUCCESS
     call t_startf('MED:'//subname)
     call med_phases_history_write_hfile(gcomp, 'ocn', 'alarm_history_inst_ocn', .false., rc)
     if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    call t_stopf('MED:'//subname)
+  end subroutine med_phases_history_write_ocn_inst
+
+  subroutine med_phases_history_write_ocn_avg(gcomp, rc)
+    ! Write mediator history file for ocn variables
+    ! input/output variables
+    type(ESMF_GridComp)  :: gcomp
+    integer, intent(out) :: rc
+    ! local variables
+    character(len=*), parameter :: subname='(med_phases_history_write_ocn_avg)'
+    !---------------------------------------
+    rc = ESMF_SUCCESS
+    call t_startf('MED:'//subname)
     call med_phases_history_write_hfile(gcomp, 'ocn', 'alarm_history_avg_ocn', .true., rc)
     if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    call t_stopf('MED:'//subname)
+  end subroutine med_phases_history_write_ocn_avg
+
+  subroutine med_phases_history_write_ocn_aux(gcomp, rc)
+    ! Write mediator history file for ocn variables
+    ! input/output variables
+    type(ESMF_GridComp)  :: gcomp
+    integer, intent(out) :: rc
+    ! local variables
+    integer :: n
+    character(len=*), parameter :: subname='(med_phases_history_write_ocn_aux)'
+    !---------------------------------------
+    rc = ESMF_SUCCESS
+    call t_startf('MED:'//subname)
     do n = 1,num_auxfiles(compocn)
        call med_phases_history_write_hfileaux(gcomp, case_name, inst_tag, n, compocn, auxfiles(compocn,n), rc=rc)
        if (ChkErr(rc,__LINE__,u_FILE_u)) return
     end do
     call t_stopf('MED:'//subname)
-  end subroutine med_phases_history_write_ocn
+  end subroutine med_phases_history_write_ocn_aux
 
   !===============================================================================
-  subroutine med_phases_history_write_rof(gcomp, rc)
-    ! --------------------------------------
+  subroutine med_phases_history_write_rof_inst(gcomp, rc)
     ! Write mediator history file for rof variables
-    ! --------------------------------------
-
     ! input/output variables
     type(ESMF_GridComp)  :: gcomp
     integer, intent(out) :: rc
-
     ! local variables
-    integer :: n
-    character(len=*), parameter :: subname='(med_phases_history_write_rof)'
+    character(len=*), parameter :: subname='(med_phases_history_write_rof_inst)'
     !---------------------------------------
     rc = ESMF_SUCCESS
     call t_startf('MED:'//subname)
     call med_phases_history_write_hfile(gcomp, 'rof', 'alarm_history_inst_rof', .false., rc)
     if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    call t_stopf('MED:'//subname)
+  end subroutine med_phases_history_write_rof_inst
+
+  subroutine med_phases_history_write_rof_avg(gcomp, rc)
+    ! Write mediator history file for rof variables
+    ! input/output variables
+    type(ESMF_GridComp)  :: gcomp
+    integer, intent(out) :: rc
+    ! local variables
+    character(len=*), parameter :: subname='(med_phases_history_write_rof_avg)'
+    !---------------------------------------
+    rc = ESMF_SUCCESS
+    call t_startf('MED:'//subname)
     call med_phases_history_write_hfile(gcomp, 'rof', 'alarm_history_avg_rof', .true., rc)
     if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    call t_stopf('MED:'//subname)
+  end subroutine med_phases_history_write_rof_avg
+
+  subroutine med_phases_history_write_rof_aux(gcomp, rc)
+    ! Write mediator history file for rof variables
+    ! input/output variables
+    type(ESMF_GridComp)  :: gcomp
+    integer, intent(out) :: rc
+    ! local variables
+    integer :: n
+    character(len=*), parameter :: subname='(med_phases_history_write_rof_aux)'
+    !---------------------------------------
+    rc = ESMF_SUCCESS
+    call t_startf('MED:'//subname)
     do n = 1,num_auxfiles(comprof)
        call med_phases_history_write_hfileaux(gcomp, case_name, inst_tag, n, comprof, auxfiles(comprof,n), rc=rc)
        if (ChkErr(rc,__LINE__,u_FILE_u)) return
     end do
     call t_stopf('MED:'//subname)
-  end subroutine med_phases_history_write_rof
+  end subroutine med_phases_history_write_rof_aux
 
   !===============================================================================
-  subroutine med_phases_history_write_wav(gcomp, rc)
-    ! --------------------------------------
+  subroutine med_phases_history_write_wav_inst(gcomp, rc)
     ! Write mediator history file for wav variables
-    ! --------------------------------------
-
     ! input/output variables
     type(ESMF_GridComp)  :: gcomp
     integer, intent(out) :: rc
-
     ! local variables
-    integer :: n
-    character(len=*), parameter :: subname='(med_phases_history_write_wav)'
+    character(len=*), parameter :: subname='(med_phases_history_write_wav_inst)'
     !---------------------------------------
     rc = ESMF_SUCCESS
     call t_startf('MED:'//subname)
     call med_phases_history_write_hfile(gcomp, 'wav', 'alarm_history_inst_wav', .false., rc)
     if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    call t_stopf('MED:'//subname)
+  end subroutine med_phases_history_write_wav_inst
+
+  subroutine med_phases_history_write_wav_avg(gcomp, rc)
+    ! Write mediator history file for wav variables
+    ! input/output variables
+    type(ESMF_GridComp)  :: gcomp
+    integer, intent(out) :: rc
+    ! local variables
+    character(len=*), parameter :: subname='(med_phases_history_write_wav_avg)'
+    !---------------------------------------
+    rc = ESMF_SUCCESS
+    call t_startf('MED:'//subname)
     call med_phases_history_write_hfile(gcomp, 'wav', 'alarm_history_avg_wav', .true., rc)
     if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    call t_stopf('MED:'//subname)
+  end subroutine med_phases_history_write_wav_avg
+
+  subroutine med_phases_history_write_wav_aux(gcomp, rc)
+    ! Write mediator history file for wav variables
+    ! input/output variables
+    type(ESMF_GridComp)  :: gcomp
+    integer, intent(out) :: rc
+    ! local variables
+    integer :: n
+    character(len=*), parameter :: subname='(med_phases_history_write_wav_aux)'
+    !---------------------------------------
+    rc = ESMF_SUCCESS
+    call t_startf('MED:'//subname)
     do n = 1,num_auxfiles(compwav)
        call med_phases_history_write_hfileaux(gcomp, case_name, inst_tag, n, compwav, auxfiles(compwav,n), rc=rc)
        if (ChkErr(rc,__LINE__,u_FILE_u)) return
     end do
     call t_stopf('MED:'//subname)
-  end subroutine med_phases_history_write_wav
+  end subroutine med_phases_history_write_wav_aux
 
   !===============================================================================
   subroutine med_phases_history_write_hfile(gcomp, comptype, alarmname, doavg, rc)
@@ -1348,7 +1520,7 @@ contains
        write(nexttimestr,'(i4.4,a,i2.2,a,i2.2,a,i5.5)') yr,'-',mon,'-',day,'-',sec
        write(logunit,*)
        write(logunit,'(a,i8)') trim(subname)//": history alarmname "//trim(alarmname)//&
-            ' is ringing, interval length is ', ringInterval_length            
+            ' is ringing, interval length is ', ringInterval_length
        write(logunit,'(a)') trim(subname)//": currtime = "//trim(currtimestr)//" nexttime = "//trim(nexttimestr)
     end if
 
