@@ -105,20 +105,19 @@ module med_phases_history_mod
   type(avgfile_type) :: avgfiles_ocnalb_atm
 
   integer, parameter :: max_auxfiles = 10
-  integer            :: num_auxfiles(ncomps) = 0
   type, public :: auxfile_type
+     character(CS), allocatable :: flds(:)       ! array of aux field names
      character(CS)              :: auxname       ! name for history file creation
      character(CL)              :: histfile = '' ! current history file name
-     character(CS), allocatable :: flds(:)       ! array of aux field names
      character(CS)              :: alarmname     ! name of write alarm
-     integer                    :: deltat        ! interval to write out aux data in seconds
      integer                    :: ntperfile     ! maximum number of time samples per file
      integer                    :: nt = 0        ! time in file
      logical                    :: useavg        ! if true, time average, otherwise instantaneous
      type(ESMF_FieldBundle)     :: FBaccum       ! field bundle for time averaging
      integer                    :: accumcnt      ! field bundle accumulation counter
   end type auxfile_type
-  type(auxfile_type) :: auxfiles(ncomps, max_auxfiles)
+  integer            , public :: num_auxfiles(ncomps) = 0
+  type(auxfile_type) , public :: auxfiles(ncomps, max_auxfiles)
 
   character(CL) :: case_name  ! case name
   character(CS) :: inst_tag   ! instance tag
@@ -362,6 +361,7 @@ contains
        ! Initialize number of aux files for this component to zero
        nfcnt = 0
        do nfile = 1,max_auxfiles
+
           ! Determine attribute prefix
           write(prefix,'(a,i0)') 'histaux_'//trim(compname(ncomp))//'2med_file',nfile
 
@@ -372,6 +372,7 @@ contains
              call NUOPC_CompAttributeGet(gcomp, name=trim(prefix)//'_flag', value=cvalue, rc=rc)
              if (ChkErr(rc,__LINE__,u_FILE_u)) return
           end if
+
           ! If flag is on - then initailize auxfiles(ncomp,nfcnt)
           if (isPresent .and. isSet .and. (trim(cvalue) == 'on')) then
              ! Increment nfcnt
@@ -441,8 +442,7 @@ contains
                 ! First duplicate all fields in FBImp(ncomp,ncomp)
                 call ESMF_LogWrite(trim(subname)// ": calling FB_init for FBaccum(ncomp)", ESMF_LOGMSG_INFO)
                 call FB_init(auxfiles(ncomp,nfcnt)%FBaccum, is_local%wrap%flds_scalar_name, &
-                     FBgeom=is_local%wrap%FBImp(ncomp,ncomp), &
-                     STflds=is_local%wrap%NStateImp(ncomp), rc=rc)
+                     FBgeom=is_local%wrap%FBImp(ncomp,ncomp), STflds=is_local%wrap%NStateImp(ncomp), rc=rc)
                 if (chkerr(rc,__LINE__,u_FILE_u)) return
 
                 ! Now remove all fields from FBAccum that are not in the input flds list
@@ -470,42 +470,35 @@ contains
                 deallocate(fieldnameList)
              end if
 
-             ! Determine history alarm for this file - advance nextAlarm so it won't ring on the first timestep
-             call NUOPC_CompAttributeGet(gcomp, name=trim(prefix)//'_deltat', value=cvalue, rc=rc)
+             ! Set alarm for auxiliary history output
+             ! Advance model clock to trigger alarms then reset model clock back to mcurrtime
+             call NUOPC_CompAttributeGet(gcomp, name=trim(prefix)//'_history_option', value=hist_option, rc=rc)
              if (ChkErr(rc,__LINE__,u_FILE_u)) return
-             if (cvalue == 'every_nstep') then
-                ! write out output each coupling interval
-                call ESMF_ClockGet(mclock, timeStep=alarmInterval, rc=rc)
-                if (ChkErr(rc,__LINE__,u_FILE_u)) return
-                call ESMF_TimeIntervalGet(alarmInterval, s=auxfiles(ncomp,nfcnt)%deltat, rc=rc)
-                if (ChkErr(rc,__LINE__,u_FILE_u)) return
-             else
-                ! get the deltat from the attribute
-                read(cvalue,*) auxfiles(ncomp,nfcnt)%deltat
-                call ESMF_TimeIntervalSet(AlarmInterval, s=auxfiles(ncomp,nfcnt)%deltat, rc=rc)
-                if (ChkErr(rc,__LINE__,u_FILE_u)) return
-             end if
-             call NUOPC_CompAttributeGet(gcomp, name=trim(prefix)//'_auxname', &
-                  value=auxfiles(ncomp,nfcnt)%auxname, rc=rc)
+             call NUOPC_CompAttributeGet(gcomp, name=trim(prefix)//'_history_n', value=cvalue, rc=rc)
              if (ChkErr(rc,__LINE__,u_FILE_u)) return
-             write(auxfiles(ncomp,nfcnt)%alarmname,'(a,i0)') 'alarm_auxhist_'//&
-                  trim(auxfiles(ncomp,nfcnt)%auxname)//'_', auxfiles(ncomp,nfcnt)%deltat
+             read(cvalue,*) hist_n
+             call NUOPC_CompAttributeGet(gcomp, name=trim(prefix)//'_auxname', value=auxfiles(ncomp,nfcnt)%auxname, rc=rc)
+             if (ChkErr(rc,__LINE__,u_FILE_u)) return
+             write(auxfiles(ncomp,nfcnt)%alarmname,'(a,i0)') 'alarm_auxhist_'//trim(prefix)
+             call med_time_alarmInit(mclock, alarm, option=hist_option, opt_n=hist_n, &
+                  reftime=mStartTime, alarmname=trim(auxfiles(ncomp,nfcnt)%alarmname), rc=rc)
+             call ESMF_AlarmSet(alarm, clock=mclock, rc=rc)
+             if (ChkErr(rc,__LINE__,u_FILE_u)) return
+             call ESMF_ClockAdvance(mclock,rc=rc)
+             if (ChkErr(rc,__LINE__,u_FILE_u)) return
+             call ESMF_ClockSet(mclock, currTime=mcurrtime, rc=rc)
+             if (ChkErr(rc,__LINE__,u_FILE_u)) return
              if (mastertask) then
-                write(logunit,'(a)') trim(subname) //' creating auxiliary history alarm '//&
-                     trim(auxfiles(ncomp,nfcnt)%alarmname)
+                write(logunit,'(a,2x,i8)') trim(subname)//" created auxiliary history alarm "//&
+                     trim(auxfiles(ncomp,nfcnt)%alarmname)//"  with option "//trim(hist_option)//" and frequency ",hist_n
              end if
-             nextAlarm = mstarttime - AlarmInterval
-             do while (nextAlarm <= mcurrtime)
-                nextAlarm = nextAlarm + AlarmInterval
-             enddo
-             alarm = ESMF_AlarmCreate( name=auxfiles(ncomp,nfcnt)%alarmname, clock=mclock, &
-                  ringTime=nextAlarm, ringInterval=alarmInterval, rc=rc)
-             if (ChkErr(rc,__LINE__,u_FILE_u)) return
-          end if ! end of isPresent and isSet and  if flag is on
-       end do ! end of loop over files (nfiles)
+
+          end if ! end of isPresent and isSet and  if flag is on for file n
+       end do ! end of loop over files (1->max_auxfiles)
 
        ! Set number of aux files for this component
        num_auxfiles(ncomp) = nfcnt
+
     end do ! end of loop over components (ncomp)
 
     ! Get file name variables
@@ -981,6 +974,17 @@ contains
     if (doavg) then
        do n = 1,ncomps
           if (comptype == 'all' .or. comptype == trim(compname(n))) then
+             ! accumulate
+             if (ESMF_FieldBundleIsCreated(avgfiles_import(n)%FBaccum)) then
+                call FB_accum(avgfiles_import(n)%FBaccum, is_local%wrap%FBImp(n,n), rc=rc)
+                if (ChkErr(rc,__LINE__,u_FILE_u)) return
+                avgfiles_import(n)%accumcnt = avgfiles_import(n)%accumcnt + 1
+             end if
+             if (ESMF_FieldBundleIsCreated(avgfiles_export(n)%FBaccum)) then
+                call FB_accum(avgfiles_export(n)%FBaccum, is_local%wrap%FBExp(n), rc=rc)
+                if (ChkErr(rc,__LINE__,u_FILE_u)) return
+                avgfiles_export(n)%accumcnt = avgfiles_export(n)%accumcnt + 1
+             end if
              if (write_now) then
                 if (ESMF_FieldBundleIsCreated(avgfiles_import(n)%FBaccum)) then
                    call FB_average(avgfiles_import(n)%FBaccum, avgfiles_import(n)%accumcnt, rc=rc)
@@ -991,17 +995,6 @@ contains
                    call FB_average(avgfiles_export(n)%FBaccum, avgfiles_export(n)%accumcnt, rc=rc)
                    if (ChkErr(rc,__LINE__,u_FILE_u)) return
                    avgfiles_export(n)%accumcnt = 0
-                end if
-             else
-                if (ESMF_FieldBundleIsCreated(avgfiles_import(n)%FBaccum)) then
-                   call FB_accum(avgfiles_import(n)%FBaccum, is_local%wrap%FBImp(n,n), rc=rc)
-                   if (ChkErr(rc,__LINE__,u_FILE_u)) return
-                   avgfiles_import(n)%accumcnt = avgfiles_import(n)%accumcnt + 1
-                end if
-                if (ESMF_FieldBundleIsCreated(avgfiles_export(n)%FBaccum)) then
-                   call FB_accum(avgfiles_export(n)%FBaccum, is_local%wrap%FBExp(n), rc=rc)
-                   if (ChkErr(rc,__LINE__,u_FILE_u)) return
-                   avgfiles_export(n)%accumcnt = avgfiles_export(n)%accumcnt + 1
                 end if
              end if
           end if
@@ -1177,7 +1170,7 @@ contains
     integer                 :: iam               ! mpi task
     integer                 :: start_ymd         ! Starting date YYYYMMDD
     integer                 :: yr,mon,day,sec    ! time units
-    real(r8)                :: tbnds(2)      ! CF1.0 time bounds
+    real(r8)                :: tbnds(2)          ! CF1.0 time bounds
     character(len=*), parameter :: subname='(med_phases_history_write_hfileaux)'
     !---------------------------------------
 
@@ -1226,16 +1219,16 @@ contains
        end if
     end if
 
-    ! Do accumulation if needed
+    ! Do accumulation and average if required
     if (auxfile%useavg) then
+       call FB_accum(auxfile%FBaccum, is_local%wrap%FBImp(comp_index,comp_index), rc=rc)
+       if (ChkErr(rc,__LINE__,u_FILE_u)) return
+       auxfile%accumcnt = auxfile%accumcnt + 1
+
        if (write_now) then
           call FB_average(auxfile%FBaccum, auxfile%accumcnt, rc=rc)
           if (ChkErr(rc,__LINE__,u_FILE_u)) return
           auxfile%accumcnt = 0
-       else
-          call FB_accum(auxfile%FBaccum, is_local%wrap%FBImp(comp_index,comp_index), rc=rc)
-          if (ChkErr(rc,__LINE__,u_FILE_u)) return
-          auxfile%accumcnt = auxfile%accumcnt + 1
        endif
     end if
 
