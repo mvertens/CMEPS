@@ -492,6 +492,11 @@ contains
                 write(logunit,'(a,2x,i8)') trim(subname)//" created auxiliary history alarm "//&
                      trim(auxfiles(ncomp,nfcnt)%alarmname)//"  with option "//trim(hist_option)//" and frequency ",hist_n
              end if
+             !DEBUG
+             call ESMF_ClockGetAlarm(mclock, alarmname=trim(auxfiles(ncomp,nfcnt)%alarmname), alarm=alarm, rc=rc)
+             if (ChkErr(rc,__LINE__,u_FILE_u)) return
+             write(6,*)'DEBUG: successfully got alarm ',ncomp,nfcnt,trim( auxfiles(ncomp,nfcnt)%alarmname)
+             !DEBUG
 
           end if ! end of isPresent and isSet and  if flag is on for file n
        end do ! end of loop over files (1->max_auxfiles)
