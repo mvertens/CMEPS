@@ -11,7 +11,7 @@ module med_phases_history_mod
   ! the run sequence provided by freeFormat, this loop becomes the driver
   ! loop level directly. Therefore, setting the timeStep or runDuration
   ! for the outer most time loop results modifiying the driver clock
-  ! itself. However, for cases with concatenated loops on the upper level
+  ! itself. However, for cases with cocnatenated loops on the upper level
   ! of the run sequence in freeFormat, a single outer loop is added
   ! automatically during ingestion, and the driver clock is used for this
   ! loop instead.
@@ -20,7 +20,7 @@ module med_phases_history_mod
   use med_kind_mod          , only : CX=>SHR_KIND_CX, CS=>SHR_KIND_CS, CL=>SHR_KIND_CL, R8=>SHR_KIND_R8
   use ESMF                  , only : ESMF_GridComp, ESMF_GridCompGet
   use ESMF                  , only : ESMF_VM, ESMF_VMGet
-  use ESMF                  , only : ESMF_Clock, ESMF_ClockGet, ESMF_ClockSet, ESMF_ClockAdvance
+  use ESMF                  , only : ESMF_Clock, ESMF_ClockGet, ESMF_ClockSet, ESMF_ClockAdvance, ESMF_ClockCreate
   use ESMF                  , only : ESMF_ClockGetNextTime, ESMF_ClockGetAlarm
   use ESMF                  , only : ESMF_Calendar
   use ESMF                  , only : ESMF_Time, ESMF_TimeGet
@@ -35,7 +35,8 @@ module med_phases_history_mod
   use ESMF                  , only : operator(==), operator(-), operator(+), operator(/=), operator(<=)
   use NUOPC                 , only : NUOPC_CompAttributeGet
   use NUOPC_Model           , only : NUOPC_ModelGet
-  use esmFlds               , only : compatm, complnd, compocn, compice, comprof, compglc, compwav, ncomps, compname
+  use esmFlds               , only : compmed, compatm, complnd, compocn, compice, comprof, compglc, compwav
+  use esmFlds               , only : ncomps, compname
   use esmFlds               , only : fldListFr, fldListTo
   use med_constants_mod     , only : SecPerDay       => med_constants_SecPerDay
   use med_constants_mod     , only : czero           => med_constants_czero
@@ -57,35 +58,37 @@ module med_phases_history_mod
   implicit none
   private
 
-  ! Public routine called from med.F90
-  public :: med_phases_history_init
-
   ! Public routines called from the run sequence
-  public :: med_phases_history_write_all_inst
-  public :: med_phases_history_write_med_inst
-  public :: med_phases_history_write_atm_inst
-  public :: med_phases_history_write_atm_avg
-  public :: med_phases_history_write_atm_aux
-  public :: med_phases_history_write_ice_inst
-  public :: med_phases_history_write_ice_avg
-  public :: med_phases_history_write_ice_aux
-  public :: med_phases_history_write_glc_inst
-  public :: med_phases_history_write_glc_avg
-  public :: med_phases_history_write_glc_aux
-  public :: med_phases_history_write_lnd_inst
-  public :: med_phases_history_write_lnd_avg
-  public :: med_phases_history_write_lnd_aux
-  public :: med_phases_history_write_ocn_inst
-  public :: med_phases_history_write_ocn_avg
-  public :: med_phases_history_write_ocn_aux
-  public :: med_phases_history_write_rof_inst
-  public :: med_phases_history_write_rof_avg
-  public :: med_phases_history_write_rof_aux
-  public :: med_phases_history_write_wav_inst
-  public :: med_phases_history_write_wav_avg
-  public :: med_phases_history_write_wav_aux
+  public :: med_phases_history_write_inst_all
+  public :: med_phases_history_write_inst_med
+  public :: med_phases_history_write_inst_atm
+  public :: med_phases_history_write_inst_ice
+  public :: med_phases_history_write_inst_glc
+  public :: med_phases_history_write_inst_lnd
+  public :: med_phases_history_write_inst_ocn
+  public :: med_phases_history_write_inst_rof
+  public :: med_phases_history_write_inst_wav
+
+  public :: med_phases_history_write_avg_atm
+  public :: med_phases_history_write_avg_ice
+  public :: med_phases_history_write_avg_glc
+  public :: med_phases_history_write_avg_lnd
+  public :: med_phases_history_write_avg_ocn
+  public :: med_phases_history_write_avg_rof
+  public :: med_phases_history_write_avg_wav
+
+  public :: med_phases_history_write_aux_atm
+  public :: med_phases_history_write_aux_ice
+  public :: med_phases_history_write_aux_glc
+  public :: med_phases_history_write_aux_lnd
+  public :: med_phases_history_write_aux_ocn
+  public :: med_phases_history_write_aux_rof
+  public :: med_phases_history_write_aux_wav
 
   ! Private routines
+  private :: med_phases_history_init_inst
+  private :: med_phases_history_init_avg
+  private :: med_phases_history_init_aux
   private :: med_phases_history_write_hfile
   private :: med_phases_history_write_hfileaux
   private :: med_phases_history_get_filename
@@ -115,14 +118,20 @@ module med_phases_history_mod
      logical                    :: useavg        ! if true, time average, otherwise instantaneous
      type(ESMF_FieldBundle)     :: FBaccum       ! field bundle for time averaging
      integer                    :: accumcnt      ! field bundle accumulation counter
+     type(ESMF_Clock)           :: hclock      ! auxiliary history clock
   end type auxfile_type
   integer            , public :: num_auxfiles(ncomps) = 0
-  type(auxfile_type) , public :: auxfiles(ncomps, max_auxfiles)
+  type(auxfile_type) , public :: auxfiles(max_auxfiles,ncomps)
 
   character(CL) :: case_name  ! case name
   character(CS) :: inst_tag   ! instance tag
 
-  logical       :: debug_alarms = .false.
+  type(ESMF_Clock) :: hclock_inst_all
+  type(ESMF_Clock) :: hclock_inst_comp(ncomps)
+
+  type(ESMF_Clock) :: hclock_avg_comp(ncomps)
+
+  logical       :: debug_alarms = .true.
   character(*), parameter :: u_FILE_u  = &
        __FILE__
 
@@ -130,45 +139,248 @@ module med_phases_history_mod
 contains
 !===============================================================================
 
+  ! TODO: remove this when no longer needed
   subroutine med_phases_history_init(gcomp, rc)
+    type(ESMF_GridComp)  :: gcomp
+    integer, intent(out) :: rc
+  end subroutine med_phases_history_init
+
+  subroutine med_phases_history_init_inst(gcomp, alarmname, hclock, rc)
 
     ! --------------------------------------
-    ! Initialize mediator history file alarms
-    ! This is called from med.F90 and is not a phase
+    ! Initialize instantaneous history file
     ! --------------------------------------
 
     ! input/output variables
-    type(ESMF_GridComp)  :: gcomp
-    integer, intent(out) :: rc
+    type(ESMF_GridComp) , intent(inout) :: gcomp
+    character(len=*)    , intent(in)    :: alarmname     ! alarm name
+    type(ESMF_Clock)    , intent(inout) :: hclock
+    integer             , intent(out)   :: rc
 
     ! local variables
-    type(InternalState)         :: is_local
-    type(ESMF_Alarm)            :: alarm
-    type(ESMF_TimeInterval)     :: alarmInterval ! alarm interval
-    type(ESMF_Time)             :: nextAlarm     ! next restart alarm time
-    type(ESMF_VM)               :: vm
     type(ESMF_Clock)            :: mclock
-    type(ESMF_TimeInterval)     :: mtimestep
-    type(ESMF_Time)             :: mCurrTime
-    type(ESMF_Time)             :: mStartTime
+    type(ESMF_Alarm)            :: alarm
+    type(ESMF_Time)             :: CurrTime
+    type(ESMF_Time)             :: StartTime
     type(ESMF_TimeInterval)     :: timestep
     integer                     :: timestep_length
-    character(CS)               :: alarmname     ! alarm name
     character(CL)               :: cvalue        ! attribute string
     character(CL)               :: hist_option   ! freq_option setting (ndays, nsteps, etc)
     integer                     :: hist_n        ! freq_n setting relative to freq_option
     logical                     :: isPresent
     logical                     :: isSet
-    character(CL)               :: auxflds       ! colon delimited string of field names
-    integer                     :: n,n1,ncomp    ! field counter
-    integer                     :: nfcnt         ! file counter
-    integer                     :: nfile         ! file counter
-    character(CS)               :: prefix        ! prefix for aux history file name
-    logical                     :: found         ! temporary logical
-    integer                     :: fieldcount
-    character(CS), allocatable  :: fieldNameList(:)
-    integer                     :: nfld
+    character(len=*), parameter :: subname=' (med_phases_history_init_inst)'
+    !---------------------------------------
+
+    rc = ESMF_SUCCESS
+
+    ! First create hclock from mclock - THIS CALL DOES NOT COPY ALARMS
+    call NUOPC_ModelGet(gcomp, modelClock=mclock,  rc=rc)
+    if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    hclock = ESMF_ClockCreate(mclock, rc=rc)
+    if (ChkErr(rc,__LINE__,u_FILE_u)) return
+
+    ! Determine instantaneous mediator output frequency and type
+    call NUOPC_CompAttributeGet(gcomp, name='history_option', isPresent=isPresent, isSet=isSet, rc=rc)
+    if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    if (isPresent .and. isSet) then
+       call NUOPC_CompAttributeGet(gcomp, name='history_option', value=hist_option, rc=rc)
+       if (ChkErr(rc,__LINE__,u_FILE_u)) return
+       call NUOPC_CompAttributeGet(gcomp, name='history_n', value=cvalue, rc=rc)
+       if (ChkErr(rc,__LINE__,u_FILE_u)) return
+       read(cvalue,*) hist_n
+    else
+       ! If attribute is not present - don't write histoyr output
+       hist_option = 'none'
+       hist_n = -999
+    end if
+
+    ! Set alarm for instantaneous history output
+    ! Advance history clock to trigger alarms then reset history clock back to mcurrtime
+    call ESMF_ClockGet(hclock, startTime=StartTime,  currTime=CurrTime, timeStep=timestep, rc=rc)
+    if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    call med_time_alarmInit(hclock, alarm, option=hist_option, opt_n=hist_n, &
+         reftime=StartTime, alarmname=trim(alarmname), rc=rc)
+    call ESMF_AlarmSet(alarm, clock=hclock, rc=rc)
+    if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    call ESMF_ClockAdvance(hclock,rc=rc)
+    if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    call ESMF_ClockSet(hclock, currTime=currtime)
+    if (ChkErr(rc,__LINE__,u_FILE_u)) return
+
+    ! Write diagnostic info
+    if (mastertask) then
+       call ESMF_TimeIntervalGet(timestep, s=timestep_length, rc=rc)
+       if (ChkErr(rc,__LINE__,u_FILE_u)) return
+       write(logunit,*)
+       write(logunit,'(a,2x,i8)') trim(subname)//" Initialized instantaneous history alarm "//&
+            trim(alarmname)//"  with option "//trim(hist_option)//" and frequency ",hist_n
+       write(logunit,'(a,2x,i8)') trim(subname)//" history clock timestep = ",timestep_length
+    end if
+
+  end subroutine med_phases_history_init_inst
+
+  !===============================================================================
+  subroutine med_phases_history_init_avg(gcomp, alarmname, hclock, rc)
+
+    ! -----------------------------
+    ! Initialize time average history file
+    ! -----------------------------
+
+    ! input/output variables
+    type(ESMF_GridComp) , intent(inout) :: gcomp
+    character(len=*)    , intent(in)    :: alarmname     ! alarm name
+    type(ESMF_Clock)    , intent(inout) :: hclock
+    integer             , intent(out)   :: rc
+
+    ! local variables
     character(len=*), parameter :: subname=' (med_phases_history_init)'
+    !---------------------------------------
+    rc = ESMF_SUCCESS
+
+    ! ! Determine time average mediator output frequency and type
+    ! hist_option = 'none'
+    ! hist_n = -999
+    ! call NUOPC_CompAttributeGet(gcomp, name='history_avg_option', isPresent=isPresent, isSet=isSet, rc=rc)
+    ! if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    ! if (isPresent .and. isSet) then
+    !    call NUOPC_CompAttributeGet(gcomp, name='history_avg_option', value=hist_option, rc=rc)
+    !    if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    !    call NUOPC_CompAttributeGet(gcomp, name='history_avg_n', value=cvalue, rc=rc)
+    !    if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    !    read(cvalue,*) hist_n
+    ! end if
+
+    ! ! Set alarm for time averaged mediator history output
+    ! alarmname = 'alarm_history_avg_all'
+    ! call med_time_alarmInit(mclock, alarm, option=hist_option, opt_n=hist_n, &
+    !      reftime=mStartTime, alarmname=trim(alarmname), rc=rc)
+    ! call ESMF_AlarmSet(alarm, clock=mclock, rc=rc)
+    ! if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    ! if (mastertask) then
+    !    write(logunit,*)
+    !    write(logunit,'(a)') trim(subname) // 'Initialize time averaged history alarms'
+    !    write(logunit,'(a,2x,i8)') trim(subname)//" set average mediator history alarm "//&
+    !         trim(alarmname)//"  with option "//trim(hist_option)//" and frequency ",hist_n
+    ! end if
+    ! do n = 1,ncomps
+    !    if (is_local%wrap%comp_present(n)) then
+    !       alarmname = 'alarm_history_avg_' // trim(compname(n))
+    !       call med_time_alarmInit(mclock, alarm, option=hist_option, opt_n=hist_n, &
+    !            reftime=mStartTime, alarmname=trim(alarmname), rc=rc)
+    !       call ESMF_AlarmSet(alarm, clock=mclock, rc=rc)
+    !       if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    !       if (mastertask) then
+    !          write(logunit,'(a,2x,i8)') trim(subname)//" set average mediator history alarm "//&
+    !               trim(alarmname)//"  with option "//trim(hist_option)//" and frequency ",hist_n
+    !       end if
+    !    end if
+    ! end do
+
+    ! ! Create time average field bundles (module variables)
+    ! if (hist_option /= 'never' .and. hist_option /= 'none') then
+    !    call NUOPC_CompAttributeGet(gcomp, name='history_avg_n', value=cvalue, rc=rc)
+    !    if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    !    read(cvalue,*) hist_n
+    !    do n = 1,ncomps
+    !       ! accumulated import fields
+    !       if (ESMF_FieldBundleIsCreated(is_local%wrap%FBimp(n,n),rc=rc)) then
+    !          call FB_init(avgfiles_import(n)%FBaccum, is_local%wrap%flds_scalar_name, &
+    !               FBgeom=is_local%wrap%FBImp(n,n), STflds=is_local%wrap%NStateImp(n), rc=rc)
+    !          if (chkerr(rc,__LINE__,u_FILE_u)) return
+    !          call FB_reset(avgfiles_import(n)%FBaccum, czero, rc)
+    !          if (chkerr(rc,__LINE__,u_FILE_u)) return
+    !          avgfiles_import(n)%accumcnt = 0
+    !       end if
+    !       ! accumulated export fields
+    !       if (ESMF_FieldBundleIsCreated(is_local%wrap%FBexp(n), rc=rc)) then
+    !          call FB_init(avgfiles_export(n)%FBaccum, is_local%wrap%flds_scalar_name, &
+    !               FBgeom=is_local%wrap%FBExp(n), STflds=is_local%wrap%NstateExp(n), rc=rc)
+    !          if (chkerr(rc,__LINE__,u_FILE_u)) return
+    !          call FB_reset(avgfiles_export(n)%FBaccum, czero, rc)
+    !          if (chkerr(rc,__LINE__,u_FILE_u)) return
+    !          avgfiles_export(n)%accumcnt = 0
+    !       end if
+    !       ! accumulated atm/ocn flux on ocn mesh
+    !       if (ESMF_FieldBundleIsCreated(is_local%wrap%FBMed_aoflux_o, rc=rc)) then
+    !          call FB_init(avgfiles_aoflux_ocn%FBaccum, is_local%wrap%flds_scalar_name, &
+    !               FBgeom=is_local%wrap%FBMed_aoflux_o, FBflds=is_local%wrap%FBMed_aoflux_o, rc=rc)
+    !          if (chkerr(rc,__LINE__,u_FILE_u)) return
+    !          call FB_reset(avgfiles_aoflux_ocn%FBaccum, czero, rc)
+    !          if (chkerr(rc,__LINE__,u_FILE_u)) return
+    !          avgfiles_aoflux_ocn%accumcnt = 0
+    !       end if
+    !       ! accumulated atm/ocn flux on atm mesh
+    !       if (ESMF_FieldBundleIsCreated(is_local%wrap%FBMed_aoflux_a, rc=rc)) then
+    !          call FB_init(avgfiles_aoflux_atm%FBaccum, is_local%wrap%flds_scalar_name, &
+    !               FBgeom=is_local%wrap%FBMed_aoflux_a, FBflds=is_local%wrap%FBMed_aoflux_a, rc=rc)
+    !          if (chkerr(rc,__LINE__,u_FILE_u)) return
+    !          call FB_reset(avgfiles_aoflux_atm%FBaccum, czero, rc)
+    !          if (chkerr(rc,__LINE__,u_FILE_u)) return
+    !          avgfiles_aoflux_atm%accumcnt = 0
+    !       end if
+    !       ! accumulated ocean albedo on ocn mesh
+    !       if (ESMF_FieldBundleIsCreated(is_local%wrap%FBMed_ocnalb_o, rc=rc)) then
+    !          call FB_init(avgfiles_ocnalb_ocn%FBaccum, is_local%wrap%flds_scalar_name, &
+    !               FBgeom=is_local%wrap%FBMed_ocnalb_o, FBflds=is_local%wrap%FBMed_ocnalb_o, rc=rc)
+    !          if (chkerr(rc,__LINE__,u_FILE_u)) return
+    !          call FB_reset(avgfiles_ocnalb_ocn%FBaccum, czero, rc)
+    !          if (chkerr(rc,__LINE__,u_FILE_u)) return
+    !          avgfiles_ocnalb_ocn%accumcnt = 0
+    !       end if
+    !       ! accumulated ocean albedo on atm mesh
+    !       if (ESMF_FieldBundleIsCreated(is_local%wrap%FBMed_ocnalb_a, rc=rc)) then
+    !          call FB_init(avgfiles_ocnalb_atm%FBaccum, is_local%wrap%flds_scalar_name, &
+    !               FBgeom=is_local%wrap%FBMed_ocnalb_a, FBflds=is_local%wrap%FBMed_ocnalb_a, rc=rc)
+    !          if (chkerr(rc,__LINE__,u_FILE_u)) return
+    !          call FB_reset(avgfiles_ocnalb_atm%FBaccum, czero, rc)
+    !          if (chkerr(rc,__LINE__,u_FILE_u)) return
+    !          avgfiles_ocnalb_atm%accumcnt = 0
+    !       end if
+    !    end do
+    ! end if
+
+  end subroutine med_phases_history_init_avg
+
+  !===============================================================================
+  subroutine med_phases_history_init_aux(gcomp, ncomp, auxfile, rc)
+
+    ! -----------------------------
+    ! Initialize auxiliary history file
+    ! NOTE:
+    ! Each time this routine is called the routine SetRunClock in med.F90 is called
+    ! at the beginning and the mediator clock current time and time step is set to the
+    ! driver current time and time step
+    ! -----------------------------
+
+    ! input/output variables
+    type(ESMF_GridComp) , intent(inout) :: gcomp
+    integer             , intent(in)    :: ncomp
+    type(auxfile_type)  , intent(inout) :: auxfile(:)
+    integer             , intent(out)   :: rc
+
+    ! local variables
+    type(InternalState)     :: is_local
+    type(ESMF_Clock)        :: mclock      ! mediator clock
+    type(ESMF_Time)         :: starttime
+    type(ESMF_Time)         :: currtime
+    type(ESMF_TimeInterval) :: timestep
+    type(ESMF_Alarm)        :: alarm
+    logical                 :: isPresent   ! is attribute present
+    logical                 :: isSet       ! is attribute set
+    character(CL)           :: hist_option ! freq_option setting (ndays, nsteps, etc)
+    integer                 :: hist_n      ! freq_n setting relative to freq_option
+    integer                 :: nfcnt
+    integer                 :: nfile
+    integer                 :: nfld
+    integer                 :: n,n1
+    character(CL)           :: prefix
+    character(CL)           :: cvalue
+    character(CL)           :: auxflds
+    integer                 :: fieldCount
+    logical                 :: found
+    character(CS), allocatable  :: fieldNameList(:)
+    character(len=*), parameter :: subname=' (med_phases_history_init_aux)'
     !---------------------------------------
 
     rc = ESMF_SUCCESS
@@ -178,335 +390,179 @@ contains
     call ESMF_GridCompGetInternalState(gcomp, is_local, rc)
     if (ChkErr(rc,__LINE__,u_FILE_u)) return
 
-    ! Get model clock, start time, current time and time step
-    call NUOPC_ModelGet(gcomp, modelClock=mclock,  rc=rc)
-    if (ChkErr(rc,__LINE__,u_FILE_u)) return
-    call ESMF_ClockGet(mclock, startTime=mStartTime,  currTime=mCurrTime, timeStep=mtimestep, rc=rc)
-    if (ChkErr(rc,__LINE__,u_FILE_u)) return
-    call ESMF_TimeIntervalGet(mtimestep, s=timestep_length, rc=rc)
-    if (ChkErr(rc,__LINE__,u_FILE_u)) return
-    if (mastertask) then
-       write(logunit,*)
-       write(logunit,'(a,2x,i8)') trim(subname)//" history clock timestep = ",timestep_length
-    end if
+    ! Initialize number of aux files for this component to zero
+    nfcnt = 0
+    do nfile = 1,max_auxfiles
 
-    ! -----------------------------
-    ! Instantaneous alarms
-    ! -----------------------------
+       ! Determine attribute prefix
+       write(prefix,'(a,i0)') 'histaux_'//trim(compname(ncomp))//'2med_file',nfile
 
-    ! Determine instantaneous mediator output frequency and type
-    hist_option = 'none'
-    hist_n = -999
-    call NUOPC_CompAttributeGet(gcomp, name='history_option', isPresent=isPresent, isSet=isSet, rc=rc)
-    if (ChkErr(rc,__LINE__,u_FILE_u)) return
-    if (isPresent .and. isSet) then
-       call NUOPC_CompAttributeGet(gcomp, name='history_option', value=hist_option, rc=rc)
+       ! Determine if on/off flag is enabled for this file
+       call NUOPC_CompAttributeGet(gcomp, name=trim(prefix)//'_enabled', isPresent=isPresent, isSet=isSet, rc=rc)
        if (ChkErr(rc,__LINE__,u_FILE_u)) return
-       call NUOPC_CompAttributeGet(gcomp, name='history_n', value=cvalue, rc=rc)
-       if (ChkErr(rc,__LINE__,u_FILE_u)) return
-       read(cvalue,*) hist_n
-    end if
-
-    ! Set alarms for instantaneous mediator history output
-    ! Advance model clock to trigger alarms then reset model clock back to mcurrtime
-    alarmname = 'alarm_history_inst_all'
-    call med_time_alarmInit(mclock, alarm, option=hist_option, opt_n=hist_n, &
-         reftime=mStartTime, alarmname=trim(alarmname), rc=rc)
-    call ESMF_AlarmSet(alarm, clock=mclock, rc=rc)
-    if (ChkErr(rc,__LINE__,u_FILE_u)) return
-    call ESMF_ClockAdvance(mclock,rc=rc)
-    if (ChkErr(rc,__LINE__,u_FILE_u)) return
-    call ESMF_ClockSet(mclock, currTime=mcurrtime, rc=rc)
-    if (ChkErr(rc,__LINE__,u_FILE_u)) return
-    if (mastertask) then
-       write(logunit,'(a,2x,i8)') trim(subname)//" set instantaneous mediator history alarm "//&
-            trim(alarmname)//"  with option "//trim(hist_option)//" and frequency ",hist_n
-    end if
-    do n = 1,ncomps
-       if (is_local%wrap%comp_present(n)) then
-          alarmname = 'alarm_history_inst_' // trim(compname(n))
-          call med_time_alarmInit(mclock, alarm, option=hist_option, opt_n=hist_n, &
-               reftime=mStartTime, alarmname=trim(alarmname), rc=rc)
-          call ESMF_AlarmSet(alarm, clock=mclock, rc=rc)
+       if (isPresent .and. isSet) then
+          call NUOPC_CompAttributeGet(gcomp, name=trim(prefix)//'_enabled', value=cvalue, rc=rc)
           if (ChkErr(rc,__LINE__,u_FILE_u)) return
-          call ESMF_ClockAdvance(mclock,rc=rc)
-          if (ChkErr(rc,__LINE__,u_FILE_u)) return
-          call ESMF_ClockSet(mclock, currTime=mcurrtime, rc=rc)
-          if (ChkErr(rc,__LINE__,u_FILE_u)) return
-          if (mastertask) then
-             write(logunit,'(a,2x,i8)') trim(subname)//" set instantaneous mediator history alarm "//&
-                  trim(alarmname)//"  with option "//trim(hist_option)//" and frequency ",hist_n
-          end if
        end if
-    end do
 
-    ! -----------------------------
-    ! Time average file initialization
-    ! -----------------------------
+       ! If enabled is on - then initailize auxfile(nfcnt)
+       if (isPresent .and. isSet .and. (trim(cvalue) == 'on')) then
 
-    ! Determine time average mediator output frequency and type
-    hist_option = 'none'
-    hist_n = -999
-    call NUOPC_CompAttributeGet(gcomp, name='history_avg_option', isPresent=isPresent, isSet=isSet, rc=rc)
-    if (ChkErr(rc,__LINE__,u_FILE_u)) return
-    if (isPresent .and. isSet) then
-       call NUOPC_CompAttributeGet(gcomp, name='history_avg_option', value=hist_option, rc=rc)
-       if (ChkErr(rc,__LINE__,u_FILE_u)) return
-       call NUOPC_CompAttributeGet(gcomp, name='history_avg_n', value=cvalue, rc=rc)
-       if (ChkErr(rc,__LINE__,u_FILE_u)) return
-       read(cvalue,*) hist_n
-    end if
+          ! Increment nfcnt
+          nfcnt = nfcnt + 1
 
-    ! Set alarm for time averaged mediator history output
-    alarmname = 'alarm_history_avg_all'
-    call med_time_alarmInit(mclock, alarm, option=hist_option, opt_n=hist_n, &
-         reftime=mStartTime, alarmname=trim(alarmname), rc=rc)
-    call ESMF_AlarmSet(alarm, clock=mclock, rc=rc)
-    if (ChkErr(rc,__LINE__,u_FILE_u)) return
-    call ESMF_ClockAdvance(mclock,rc=rc)
-    if (ChkErr(rc,__LINE__,u_FILE_u)) return
-    call ESMF_ClockSet(mclock, currTime=mcurrtime, rc=rc)
-    if (ChkErr(rc,__LINE__,u_FILE_u)) return
-    if (mastertask) then
-       write(logunit,'(a,2x,i8)') trim(subname)//" set average mediator history alarm "//&
-            trim(alarmname)//"  with option "//trim(hist_option)//" and frequency ",hist_n
-    end if
-    do n = 1,ncomps
-       if (is_local%wrap%comp_present(n)) then
-          alarmname = 'alarm_history_avg_' // trim(compname(n))
-          call med_time_alarmInit(mclock, alarm, option=hist_option, opt_n=hist_n, &
-               reftime=mStartTime, alarmname=trim(alarmname), rc=rc)
-          call ESMF_AlarmSet(alarm, clock=mclock, rc=rc)
+          ! Determine number of time samples per file
+          call NUOPC_CompAttributeGet(gcomp, name=trim(prefix)//'_ntperfile', value=cvalue, rc=rc)
           if (ChkErr(rc,__LINE__,u_FILE_u)) return
-          call ESMF_ClockAdvance(mclock,rc=rc)
+          read(cvalue,*) auxfile(nfcnt)%ntperfile
           if (ChkErr(rc,__LINE__,u_FILE_u)) return
-          call ESMF_ClockSet(mclock, currTime=mcurrtime, rc=rc)
+
+          ! Determine if will do time average
+          call NUOPC_CompAttributeGet(gcomp, name=trim(prefix)//'_useavg', value=cvalue, rc=rc)
           if (ChkErr(rc,__LINE__,u_FILE_u)) return
-          if (mastertask) then
-             write(logunit,'(a,2x,i8)') trim(subname)//" set average mediator history alarm "//&
-                  trim(alarmname)//"  with option "//trim(hist_option)//" and frequency ",hist_n
-          end if
-       end if
-    end do
+          read(cvalue,*) auxfile(nfcnt)%useavg
 
-    ! Create time average field bundles (module variables)
-    if (hist_option /= 'never' .and. hist_option /= 'none') then
-       call NUOPC_CompAttributeGet(gcomp, name='history_avg_n', value=cvalue, rc=rc)
-       if (ChkErr(rc,__LINE__,u_FILE_u)) return
-       read(cvalue,*) hist_n
-       do n = 1,ncomps
-          ! accumulated import fields
-          if (ESMF_FieldBundleIsCreated(is_local%wrap%FBimp(n,n),rc=rc)) then
-             call FB_init(avgfiles_import(n)%FBaccum, is_local%wrap%flds_scalar_name, &
-                  FBgeom=is_local%wrap%FBImp(n,n), STflds=is_local%wrap%NStateImp(n), rc=rc)
-             if (chkerr(rc,__LINE__,u_FILE_u)) return
-             call FB_reset(avgfiles_import(n)%FBaccum, czero, rc)
-             if (chkerr(rc,__LINE__,u_FILE_u)) return
-             avgfiles_import(n)%accumcnt = 0
-          end if
-          ! accumulated export fields
-          if (ESMF_FieldBundleIsCreated(is_local%wrap%FBexp(n), rc=rc)) then
-             call FB_init(avgfiles_export(n)%FBaccum, is_local%wrap%flds_scalar_name, &
-                  FBgeom=is_local%wrap%FBExp(n), STflds=is_local%wrap%NstateExp(n), rc=rc)
-             if (chkerr(rc,__LINE__,u_FILE_u)) return
-             call FB_reset(avgfiles_export(n)%FBaccum, czero, rc)
-             if (chkerr(rc,__LINE__,u_FILE_u)) return
-             avgfiles_export(n)%accumcnt = 0
-          end if
-          ! accumulated atm/ocn flux on ocn mesh
-          if (ESMF_FieldBundleIsCreated(is_local%wrap%FBMed_aoflux_o, rc=rc)) then
-             call FB_init(avgfiles_aoflux_ocn%FBaccum, is_local%wrap%flds_scalar_name, &
-                  FBgeom=is_local%wrap%FBMed_aoflux_o, FBflds=is_local%wrap%FBMed_aoflux_o, rc=rc)
-             if (chkerr(rc,__LINE__,u_FILE_u)) return
-             call FB_reset(avgfiles_aoflux_ocn%FBaccum, czero, rc)
-             if (chkerr(rc,__LINE__,u_FILE_u)) return
-             avgfiles_aoflux_ocn%accumcnt = 0
-          end if
-          ! accumulated atm/ocn flux on atm mesh
-          if (ESMF_FieldBundleIsCreated(is_local%wrap%FBMed_aoflux_a, rc=rc)) then
-             call FB_init(avgfiles_aoflux_atm%FBaccum, is_local%wrap%flds_scalar_name, &
-                  FBgeom=is_local%wrap%FBMed_aoflux_a, FBflds=is_local%wrap%FBMed_aoflux_a, rc=rc)
-             if (chkerr(rc,__LINE__,u_FILE_u)) return
-             call FB_reset(avgfiles_aoflux_atm%FBaccum, czero, rc)
-             if (chkerr(rc,__LINE__,u_FILE_u)) return
-             avgfiles_aoflux_atm%accumcnt = 0
-          end if
-          ! accumulated ocean albedo on ocn mesh
-          if (ESMF_FieldBundleIsCreated(is_local%wrap%FBMed_ocnalb_o, rc=rc)) then
-             call FB_init(avgfiles_ocnalb_ocn%FBaccum, is_local%wrap%flds_scalar_name, &
-                  FBgeom=is_local%wrap%FBMed_ocnalb_o, FBflds=is_local%wrap%FBMed_ocnalb_o, rc=rc)
-             if (chkerr(rc,__LINE__,u_FILE_u)) return
-             call FB_reset(avgfiles_ocnalb_ocn%FBaccum, czero, rc)
-             if (chkerr(rc,__LINE__,u_FILE_u)) return
-             avgfiles_ocnalb_ocn%accumcnt = 0
-          end if
-          ! accumulated ocean albedo on atm mesh
-          if (ESMF_FieldBundleIsCreated(is_local%wrap%FBMed_ocnalb_a, rc=rc)) then
-             call FB_init(avgfiles_ocnalb_atm%FBaccum, is_local%wrap%flds_scalar_name, &
-                  FBgeom=is_local%wrap%FBMed_ocnalb_a, FBflds=is_local%wrap%FBMed_ocnalb_a, rc=rc)
-             if (chkerr(rc,__LINE__,u_FILE_u)) return
-             call FB_reset(avgfiles_ocnalb_atm%FBaccum, czero, rc)
-             if (chkerr(rc,__LINE__,u_FILE_u)) return
-             avgfiles_ocnalb_atm%accumcnt = 0
-          end if
-       end do
-    end if
-
-    ! -----------------------------
-    ! Auxiliary file(s) initialization
-    ! -----------------------------
-
-    do ncomp = 2,ncomps ! skip the mediator
-
-       ! Initialize number of aux files for this component to zero
-       nfcnt = 0
-       do nfile = 1,max_auxfiles
-
-          ! Determine attribute prefix
-          write(prefix,'(a,i0)') 'histaux_'//trim(compname(ncomp))//'2med_file',nfile
-
-          ! Determine if on/off flag for this file exists
-          call NUOPC_CompAttributeGet(gcomp, name=trim(prefix)//'_flag', isPresent=isPresent, isSet=isSet, rc=rc)
+          ! Determine the colon delimited field names for this file
+          call NUOPC_CompAttributeGet(gcomp, name=trim(prefix)//'_flds', value=auxflds, rc=rc)
           if (ChkErr(rc,__LINE__,u_FILE_u)) return
-          if (isPresent .and. isSet) then
-             call NUOPC_CompAttributeGet(gcomp, name=trim(prefix)//'_flag', value=cvalue, rc=rc)
-             if (ChkErr(rc,__LINE__,u_FILE_u)) return
-          end if
 
-          ! If flag is on - then initailize auxfiles(ncomp,nfcnt)
-          if (isPresent .and. isSet .and. (trim(cvalue) == 'on')) then
-             ! Increment nfcnt
-             nfcnt = nfcnt + 1
+          ! Determine fields that will be output to auxhist files
+          if (trim(auxflds) == 'all') then
 
-             ! Determine number of time samples per file
-             call NUOPC_CompAttributeGet(gcomp, name=trim(prefix)//'_ntperfile', value=cvalue, rc=rc)
-             if (ChkErr(rc,__LINE__,u_FILE_u)) return
-             read(cvalue,*) auxfiles(ncomp,nfcnt)%ntperfile
-             if (ChkErr(rc,__LINE__,u_FILE_u)) return
+             ! Output all fields sent to the mediator from ncomp to the auxhist files
+             call ESMF_FieldBundleGet(is_local%wrap%FBImp(ncomp,ncomp), &
+                  fieldCount=fieldCount, rc=rc)
+             if (chkerr(rc,__LINE__,u_FILE_u)) return
+             allocate(auxfile(nfcnt)%flds(fieldcount))
+             call ESMF_FieldBundleGet(is_local%wrap%FBImp(ncomp,ncomp), &
+                  fieldNameList=auxfile(nfcnt)%flds, rc=rc)
+             if (chkerr(rc,__LINE__,u_FILE_u)) return
 
-             ! Determine if will do time average
-             call NUOPC_CompAttributeGet(gcomp, name=trim(prefix)//'_useavg', value=cvalue, rc=rc)
-             if (ChkErr(rc,__LINE__,u_FILE_u)) return
-             read(cvalue,*) auxfiles(ncomp,nfcnt)%useavg
+          else
 
-             ! Determine fields that will be output to auxhist files
-             ! First dtermine the colon delimited field names for this file
-             call NUOPC_CompAttributeGet(gcomp, name=trim(prefix)//'_flds', value=auxflds, rc=rc)
-             if (ChkErr(rc,__LINE__,u_FILE_u)) return
-             if (auxflds == 'all') then
-                ! Output all fields sent to the mediator from ncomp to the auxhist files
-                call ESMF_FieldBundleGet(is_local%wrap%FBImp(ncomp,ncomp), &
-                     fieldCount=fieldCount, rc=rc)
-                if (chkerr(rc,__LINE__,u_FILE_u)) return
-                allocate(auxfiles(ncomp,nfcnt)%flds(fieldcount))
-                call ESMF_FieldBundleGet(is_local%wrap%FBImp(ncomp,ncomp), &
-                     fieldNameList=auxfiles(ncomp,nfcnt)%flds, rc=rc)
-                if (chkerr(rc,__LINE__,u_FILE_u)) return
-             else
-                ! Translate the colon deliminted string (auxflds) into a character array (fieldnamelist)
-                ! Note that the following call allocates the memory for fieldnamelist
-                call med_phases_history_get_auxflds(auxflds, fieldnamelist, rc)
+             ! Translate the colon deliminted string (auxflds) into a character array (fieldnamelist)
+             ! Note that the following call allocates the memory for fieldnamelist
+             call med_phases_history_get_auxflds(auxflds, fieldnamelist, rc)
 
-                ! Remove all fields from fieldnamelist that are not in FBImp(ncomp,ncomp)
-                fieldCount = size(fieldnamelist)
-                do n = 1,fieldcount
-                   if (.not. FB_fldchk(is_local%wrap%FBImp(ncomp,ncomp), &
-                        trim(fieldnamelist(n)), rc)) then
-                      do n1 = n, fieldCount-1
-                         fieldnamelist(n1) = fieldnamelist(n1+1)
-                      end do
-                      fieldCount = fieldCount - 1
-                   end if
-                end do
-
-                ! Create auxfiles(ncomp,nfcnt)%flds array
-                allocate(auxfiles(ncomp,nfcnt)%flds(fieldcount))
-                do n = 1,fieldcount
-                   auxfiles(ncomp,nfcnt)%flds(n) = trim(fieldnamelist(n))
-                end do
-
-                ! Deallocate memory from fieldnamelist
-                deallocate(fieldnamelist) ! this was allocated in med_phases_history_get_auxflds
-             end if
-             if (mastertask) then
-                write(logunit,*)
-                write(logunit,'(a,i4,a)') trim(subname)//' Outputing the following fields to auxfile ',nfcnt,&
-                     ' for component '//trim(compname(ncomp))
-                do nfld = 1,size(auxfiles(ncomp,nfcnt)%flds)
-                   write(logunit,'(4x,a)') trim(auxfiles(ncomp,nfcnt)%flds(nfld))
-                end do
-             end if
-
-             ! Create FBaccum if averaging is on
-             if (auxfiles(ncomp,nfcnt)%useavg) then
-                ! First duplicate all fields in FBImp(ncomp,ncomp)
-                call ESMF_LogWrite(trim(subname)// ": calling FB_init for FBaccum(ncomp)", ESMF_LOGMSG_INFO)
-                call FB_init(auxfiles(ncomp,nfcnt)%FBaccum, is_local%wrap%flds_scalar_name, &
-                     FBgeom=is_local%wrap%FBImp(ncomp,ncomp), STflds=is_local%wrap%NStateImp(ncomp), rc=rc)
-                if (chkerr(rc,__LINE__,u_FILE_u)) return
-
-                ! Now remove all fields from FBAccum that are not in the input flds list
-                call ESMF_FieldBundleGet(is_local%wrap%FBImp(ncomp,ncomp), &
-                     fieldCount=fieldCount, rc=rc)
-                if (chkerr(rc,__LINE__,u_FILE_u)) return
-                allocate(fieldNameList(fieldCount))
-                call ESMF_FieldBundleGet(is_local%wrap%FBImp(ncomp,ncomp), &
-                     fieldNameList=fieldNameList, rc=rc)
-                if (chkerr(rc,__LINE__,u_FILE_u)) return
-                do n = 1,size(fieldnamelist)
-                   found = .false.
-                   do n1 = 1,size(auxfiles(ncomp,nfcnt)%flds)
-                      if (trim(fieldnamelist(n)) == trim(auxfiles(ncomp,nfcnt)%flds(n1))) then
-                         found = .true.
-                         exit
-                      end if
+             ! Remove all fields from fieldnamelist that are not in FBImp(ncomp,ncomp)
+             fieldCount = size(fieldnamelist)
+             do n = 1,fieldcount
+                if (.not. FB_fldchk(is_local%wrap%FBImp(ncomp,ncomp), trim(fieldnamelist(n)), rc)) then
+                   do n1 = n, fieldCount-1
+                      fieldnamelist(n1) = fieldnamelist(n1+1)
                    end do
-                   if (.not. found) then
-                      call ESMF_FieldBundleRemove(auxfiles(ncomp,nfcnt)%FBaccum, &
-                           fieldnamelist(n:n), rc=rc)
-                      if (chkerr(rc,__LINE__,u_FILE_u)) return
+                   fieldCount = fieldCount - 1
+                end if
+             end do
+
+             ! Create auxfile(nfcnt)%flds array
+             allocate(auxfile(nfcnt)%flds(fieldcount))
+             do n = 1,fieldcount
+                auxfile(nfcnt)%flds(n) = trim(fieldnamelist(n))
+             end do
+
+             ! Deallocate memory from fieldnamelist
+             deallocate(fieldnamelist) ! this was allocated in med_phases_history_get_auxflds
+          end if
+          if (mastertask) then
+             write(logunit,*)
+             write(logunit,'(a,i4,a)') trim(subname)//' Writing the following fields to auxfile ',nfcnt,&
+                  ' for component '//trim(compname(ncomp))
+             do nfld = 1,size(auxfile(nfcnt)%flds)
+                write(logunit,'(4x,a)') trim(auxfile(nfcnt)%flds(nfld))
+             end do
+          end if
+
+          ! Create FBaccum if averaging is on
+          if (auxfile(nfcnt)%useavg) then
+
+             ! First duplicate all fields in FBImp(ncomp,ncomp)
+             call ESMF_LogWrite(trim(subname)// ": calling FB_init for FBaccum(ncomp)", ESMF_LOGMSG_INFO)
+             call FB_init(auxfile(nfcnt)%FBaccum, is_local%wrap%flds_scalar_name, &
+                  FBgeom=is_local%wrap%FBImp(ncomp,ncomp), STflds=is_local%wrap%NStateImp(ncomp), rc=rc)
+             if (chkerr(rc,__LINE__,u_FILE_u)) return
+
+             ! Now remove all fields from FBAccum that are not in the input flds list
+             call ESMF_FieldBundleGet(is_local%wrap%FBImp(ncomp,ncomp), &
+                  fieldCount=fieldCount, rc=rc)
+             if (chkerr(rc,__LINE__,u_FILE_u)) return
+             allocate(fieldNameList(fieldCount))
+             call ESMF_FieldBundleGet(is_local%wrap%FBImp(ncomp,ncomp), &
+                  fieldNameList=fieldNameList, rc=rc)
+             if (chkerr(rc,__LINE__,u_FILE_u)) return
+             do n = 1,size(fieldnamelist)
+                found = .false.
+                do n1 = 1,size(auxfile(nfcnt)%flds)
+                   if (trim(fieldnamelist(n)) == trim(auxfile(nfcnt)%flds(n1))) then
+                      found = .true.
+                      exit
                    end if
                 end do
-                deallocate(fieldnameList)
+                if (.not. found) then
+                   call ESMF_FieldBundleRemove(auxfile(nfcnt)%FBaccum, &
+                        fieldnamelist(n:n), rc=rc)
+                   if (chkerr(rc,__LINE__,u_FILE_u)) return
+                end if
+             end do
+             deallocate(fieldnameList)
+
+             ! Check that FBAccum has at least one field left - if not exit
+             call ESMF_FieldBundleGet(auxfile(nfcnt)%FBAccum, fieldCount=nfld, rc=rc)
+             if (chkerr(rc,__LINE__,u_FILE_u)) return
+             if (nfld == 0) then
+                call ESMF_LogWrite(subname//'FBAccum is zero for '//trim(auxfile(nfcnt)%auxname), &
+                     ESMF_LOGMSG_ERROR)
+                rc = ESMF_FAILURE
+                if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) then
+                   call ESMF_Finalize(endflag=ESMF_END_ABORT)
+                end if
              end if
 
-             ! Set alarm for auxiliary history output
-             ! Advance model clock to trigger alarms then reset model clock back to mcurrtime
-             call NUOPC_CompAttributeGet(gcomp, name=trim(prefix)//'_history_option', value=hist_option, rc=rc)
-             if (ChkErr(rc,__LINE__,u_FILE_u)) return
-             call NUOPC_CompAttributeGet(gcomp, name=trim(prefix)//'_history_n', value=cvalue, rc=rc)
-             if (ChkErr(rc,__LINE__,u_FILE_u)) return
-             read(cvalue,*) hist_n
-             call NUOPC_CompAttributeGet(gcomp, name=trim(prefix)//'_auxname', value=auxfiles(ncomp,nfcnt)%auxname, rc=rc)
-             if (ChkErr(rc,__LINE__,u_FILE_u)) return
-             write(auxfiles(ncomp,nfcnt)%alarmname,'(a,i0)') 'alarm_auxhist_'//trim(prefix)
-             call med_time_alarmInit(mclock, alarm, option=hist_option, opt_n=hist_n, &
-                  reftime=mStartTime, alarmname=trim(auxfiles(ncomp,nfcnt)%alarmname), rc=rc)
-             call ESMF_AlarmSet(alarm, clock=mclock, rc=rc)
-             if (ChkErr(rc,__LINE__,u_FILE_u)) return
-             call ESMF_ClockAdvance(mclock,rc=rc)
-             if (ChkErr(rc,__LINE__,u_FILE_u)) return
-             call ESMF_ClockSet(mclock, currTime=mcurrtime, rc=rc)
-             if (ChkErr(rc,__LINE__,u_FILE_u)) return
-             if (mastertask) then
-                write(logunit,'(a,2x,i8)') trim(subname)//" created auxiliary history alarm "//&
-                     trim(auxfiles(ncomp,nfcnt)%alarmname)//"  with option "//trim(hist_option)//" and frequency ",hist_n
-             end if
-             !DEBUG
-             call ESMF_ClockGetAlarm(mclock, alarmname=trim(auxfiles(ncomp,nfcnt)%alarmname), alarm=alarm, rc=rc)
-             if (ChkErr(rc,__LINE__,u_FILE_u)) return
-             write(6,*)'DEBUG: successfully got alarm ',ncomp,nfcnt,trim( auxfiles(ncomp,nfcnt)%alarmname)
-             !DEBUG
+          end if
 
-          end if ! end of isPresent and isSet and  if flag is on for file n
-       end do ! end of loop over files (1->max_auxfiles)
+          ! Determine auxiliary file output frequency and type
+          call NUOPC_CompAttributeGet(gcomp, name=trim(prefix)//'_history_option', value=hist_option, rc=rc)
+          if (ChkErr(rc,__LINE__,u_FILE_u)) return
+          call NUOPC_CompAttributeGet(gcomp, name=trim(prefix)//'_history_n', value=cvalue, rc=rc)
+          if (ChkErr(rc,__LINE__,u_FILE_u)) return
+          read(cvalue,*) hist_n
 
-       ! Set number of aux files for this component
-       num_auxfiles(ncomp) = nfcnt
+          ! First create hclock from mclock - THIS CALL DOES NOT COPY ALARMS
+          call NUOPC_ModelGet(gcomp, modelClock=mclock,  rc=rc)
+          if (ChkErr(rc,__LINE__,u_FILE_u)) return
+          auxfile(nfcnt)%hclock = ESMF_ClockCreate(mclock, rc=rc)
+          if (ChkErr(rc,__LINE__,u_FILE_u)) return
 
-    end do ! end of loop over components (ncomp)
+          ! Set alarm for auxiliary history output
+          ! Advance history clock to trigger alarms then reset history clock back to mcurrtime
+          call NUOPC_CompAttributeGet(gcomp, name=trim(prefix)//'_auxname', value=auxfile(nfcnt)%auxname, rc=rc)
+          if (ChkErr(rc,__LINE__,u_FILE_u)) return
+          write(auxfile(nfcnt)%alarmname,'(a,i0)') 'alarm_'//trim(prefix)
+          call ESMF_ClockGet(auxfile(nfcnt)%hclock, startTime=starttime,  currTime=currtime, timeStep=timestep, rc=rc)
+          if (ChkErr(rc,__LINE__,u_FILE_u)) return
+          call med_time_alarmInit(auxfile(nfcnt)%hclock, alarm, option=hist_option, opt_n=hist_n, &
+               reftime=starttime, alarmname=trim(auxfile(nfcnt)%alarmname), rc=rc)
+          if (ChkErr(rc,__LINE__,u_FILE_u)) return
+          call ESMF_AlarmSet(alarm, clock=auxfile(nfcnt)%hclock, rc=rc)
+          if (ChkErr(rc,__LINE__,u_FILE_u)) return
+          call ESMF_ClockAdvance(auxfile(nfcnt)%hclock, rc=rc)
+          if (ChkErr(rc,__LINE__,u_FILE_u)) return
+          call ESMF_ClockSet(auxfile(nfcnt)%hclock, currtime=currtime)
+          if (ChkErr(rc,__LINE__,u_FILE_u)) return
+          if (mastertask) then
+             write(logunit,'(a,2x,i8)') trim(subname)//" created auxiliary history alarm "//&
+                  trim(auxfile(nfcnt)%alarmname)//"  with option "//trim(hist_option)//" and frequency ",hist_n
+          end if
+
+       end if ! end of isPresent and isSet and  if flag is on for file n
+    end do ! end of loop over files (1->max_auxfiles)
+
+    ! Set number of aux files for this component
+    num_auxfiles(ncomp) = nfcnt
 
     ! Get file name variables
+    ! TODO: these are general settings that should be set outside of this system
+    ! These should be moved outside of this modeul
     call NUOPC_CompAttributeGet(gcomp, name='case_name', value=case_name, rc=rc)
     if (ChkErr(rc,__LINE__,u_FILE_u)) return
     call NUOPC_CompAttributeGet(gcomp, name='inst_suffix', isPresent=isPresent, rc=rc)
@@ -520,399 +576,15 @@ contains
 
     if (mastertask) write(logunit,*)
 
-  end subroutine med_phases_history_init
+  end subroutine med_phases_history_init_aux
 
   !===============================================================================
-  subroutine med_phases_history_write_all_inst(gcomp, rc)
-    ! --------------------------------------
-    ! Write mediator history file for all variables
-    ! This is a phase called by the run sequence
-    ! --------------------------------------
-    ! input/output variables
-    type(ESMF_GridComp)  :: gcomp
-    integer, intent(out) :: rc
-
-    ! local variables
-    character(len=*), parameter :: subname='(med_phases_history_write)'
-    !---------------------------------------
-    rc = ESMF_SUCCESS
-    call t_startf('MED:'//subname)
-    call med_phases_history_write_hfile(gcomp, 'all', 'alarm_history_inst_all', .false., rc)
-    if (ChkErr(rc,__LINE__,u_FILE_u)) return
-    call t_stopf('MED:'//subname)
-  end subroutine med_phases_history_write_all_inst
-
-  !===============================================================================
-  subroutine med_phases_history_write_med_inst(gcomp, rc)
-    ! Write mediator history file for med variables - only instantaneous files are written
-    ! This writes out ocean albedoes and atm/ocean fluxes computed by the mediator
-    ! along with the fractions computed by the mediator
-
-    ! input/output variables
-    type(ESMF_GridComp)  :: gcomp
-    integer, intent(out) :: rc
-
-    ! local variables
-    character(len=*), parameter :: subname='(med_phases_history_write_med)'
-    !---------------------------------------
-    rc = ESMF_SUCCESS
-    call t_startf('MED:'//subname)
-    call med_phases_history_write_hfile(gcomp, 'med', 'alarm_history_inst_med', .false., rc)
-    if (ChkErr(rc,__LINE__,u_FILE_u)) return
-    call t_stopf('MED:'//subname)
-  end subroutine med_phases_history_write_med_inst
-
-  !===============================================================================
-  subroutine med_phases_history_write_atm_inst(gcomp, rc)
-    ! Write mediator history file for atm variables
-    ! input/output variables
-    type(ESMF_GridComp)  :: gcomp
-    integer, intent(out) :: rc
-    ! local variables
-    integer :: n
-    character(len=*), parameter :: subname='(med_phases_history_write_atm_inst)'
-    !---------------------------------------
-    rc = ESMF_SUCCESS
-    call t_startf('MED:'//subname)
-    call med_phases_history_write_hfile(gcomp, 'atm', 'alarm_history_inst_atm', .false., rc)
-    if (ChkErr(rc,__LINE__,u_FILE_u)) return
-    call t_stopf('MED:'//subname)
-  end subroutine med_phases_history_write_atm_inst
-
-  subroutine med_phases_history_write_atm_avg(gcomp, rc)
-    ! Write mediator history file for atm variables
-    ! input/output variables
-    type(ESMF_GridComp)  :: gcomp
-    integer, intent(out) :: rc
-    ! local variables
-    integer :: n
-    character(len=*), parameter :: subname='(med_phases_history_write_atm_avg)'
-    !---------------------------------------
-    rc = ESMF_SUCCESS
-    call t_startf('MED:'//subname)
-    call med_phases_history_write_hfile(gcomp, 'atm', 'alarm_history_avg_atm', .true., rc)
-    if (ChkErr(rc,__LINE__,u_FILE_u)) return
-    call t_stopf('MED:'//subname)
-  end subroutine med_phases_history_write_atm_avg
-
-  subroutine med_phases_history_write_atm_aux(gcomp, rc)
-    ! Write mediator history file for atm variables
-    ! input/output variables
-    type(ESMF_GridComp)  :: gcomp
-    integer, intent(out) :: rc
-    ! local variables
-    integer :: n
-    character(len=*), parameter :: subname='(med_phases_history_write_atm)'
-    !---------------------------------------
-    rc = ESMF_SUCCESS
-    call t_startf('MED:'//subname)
-    do n = 1,num_auxfiles(compatm)
-       call med_phases_history_write_hfileaux(gcomp, case_name, inst_tag, n, compatm, auxfiles(compatm,n), rc=rc)
-       if (ChkErr(rc,__LINE__,u_FILE_u)) return
-    end do
-    call t_stopf('MED:'//subname)
-  end subroutine med_phases_history_write_atm_aux
-
-  !===============================================================================
-  subroutine med_phases_history_write_ice_inst(gcomp, rc)
-    ! Write mediator history file for ice variables
-    ! input/output variables
-    type(ESMF_GridComp)  :: gcomp
-    integer, intent(out) :: rc
-    ! local variables
-    character(len=*), parameter :: subname='(med_phases_history_write_ice_inst)'
-    !---------------------------------------
-    rc = ESMF_SUCCESS
-    call t_startf('MED:'//subname)
-    call med_phases_history_write_hfile(gcomp, 'ice', 'alarm_history_inst_ice', .false., rc)
-    if (ChkErr(rc,__LINE__,u_FILE_u)) return
-    call t_stopf('MED:'//subname)
-  end subroutine med_phases_history_write_ice_inst
-
-  subroutine med_phases_history_write_ice_avg(gcomp, rc)
-    ! Write mediator history file for ice variables
-    ! input/output variables
-    type(ESMF_GridComp)  :: gcomp
-    integer, intent(out) :: rc
-    ! local variables
-    character(len=*), parameter :: subname='(med_phases_history_write_ice_avg)'
-    !---------------------------------------
-    rc = ESMF_SUCCESS
-    call t_startf('MED:'//subname)
-    call med_phases_history_write_hfile(gcomp, 'ice', 'alarm_history_avg_ice', .true., rc)
-    if (ChkErr(rc,__LINE__,u_FILE_u)) return
-    call t_stopf('MED:'//subname)
-  end subroutine med_phases_history_write_ice_avg
-
-  subroutine med_phases_history_write_ice_aux(gcomp, rc)
-    ! Write mediator history file for ice variables
-    ! input/output variables
-    type(ESMF_GridComp)  :: gcomp
-    integer, intent(out) :: rc
-    ! local variables
-    integer :: n
-    character(len=*), parameter :: subname='(med_phases_history_write_ice)'
-    !---------------------------------------
-    rc = ESMF_SUCCESS
-    call t_startf('MED:'//subname)
-    do n = 1,num_auxfiles(compice)
-       call med_phases_history_write_hfileaux(gcomp, case_name, inst_tag, n, compice, auxfiles(compice,n), rc=rc)
-       if (ChkErr(rc,__LINE__,u_FILE_u)) return
-    end do
-    call t_stopf('MED:'//subname)
-  end subroutine med_phases_history_write_ice_aux
-
-  !===============================================================================
-  subroutine med_phases_history_write_glc_inst(gcomp, rc)
-    ! Write mediator history file for glc variables
-    ! input/output variables
-    type(ESMF_GridComp)  :: gcomp
-    integer, intent(out) :: rc
-    ! local variables
-    integer :: n
-    character(len=*), parameter :: subname='(med_phases_history_write_glc_inst)'
-    !---------------------------------------
-    rc = ESMF_SUCCESS
-    call t_startf('MED:'//subname)
-    call med_phases_history_write_hfile(gcomp, 'glc', 'alarm_history_inst_glc', .false., rc)
-    call t_stopf('MED:'//subname)
-  end subroutine med_phases_history_write_glc_inst
-
-  subroutine med_phases_history_write_glc_avg(gcomp, rc)
-    ! Write mediator history file for glc variables
-    ! input/output variables
-    type(ESMF_GridComp)  :: gcomp
-    integer, intent(out) :: rc
-    ! local variables
-    character(len=*), parameter :: subname='(med_phases_history_write_glc_avg)'
-    !---------------------------------------
-    rc = ESMF_SUCCESS
-    call t_startf('MED:'//subname)
-    call med_phases_history_write_hfile(gcomp, 'glc', 'alarm_history_avg_glc', .true., rc)
-    if (ChkErr(rc,__LINE__,u_FILE_u)) return
-    call t_stopf('MED:'//subname)
-  end subroutine med_phases_history_write_glc_avg
-
-  subroutine med_phases_history_write_glc_aux(gcomp, rc)
-    ! Write mediator history file for glc variables
-    ! input/output variables
-    type(ESMF_GridComp)  :: gcomp
-    integer, intent(out) :: rc
-    ! local variables
-    integer :: n
-    character(len=*), parameter :: subname='(med_phases_history_write_glc)'
-    !---------------------------------------
-    rc = ESMF_SUCCESS
-    call t_startf('MED:'//subname)
-    do n = 1,num_auxfiles(compglc)
-       call med_phases_history_write_hfileaux(gcomp, case_name, inst_tag, n, compglc, auxfiles(compglc,n), rc=rc)
-       if (ChkErr(rc,__LINE__,u_FILE_u)) return
-    end do
-    call t_stopf('MED:'//subname)
-  end subroutine med_phases_history_write_glc_aux
-
-  !===============================================================================
-  subroutine med_phases_history_write_lnd_inst(gcomp, rc)
-    ! Write mediator history file for lnd variables
-    ! input/output variables
-    type(ESMF_GridComp)  :: gcomp
-    integer, intent(out) :: rc
-    ! local variables
-    character(len=*), parameter :: subname='(med_phases_history_write_lnd_inst)'
-    !---------------------------------------
-    rc = ESMF_SUCCESS
-    call t_startf('MED:'//subname)
-    call med_phases_history_write_hfile(gcomp, 'lnd', 'alarm_history_inst_lnd', .false., rc)
-    if (ChkErr(rc,__LINE__,u_FILE_u)) return
-    call t_stopf('MED:'//subname)
-  end subroutine med_phases_history_write_lnd_inst
-
-  subroutine med_phases_history_write_lnd_avg(gcomp, rc)
-    ! Write mediator history file for lnd variables
-    ! input/output variables
-    type(ESMF_GridComp)  :: gcomp
-    integer, intent(out) :: rc
-    ! local variables
-    character(len=*), parameter :: subname='(med_phases_history_write_lnd_avg)'
-    !---------------------------------------
-    rc = ESMF_SUCCESS
-    call t_startf('MED:'//subname)
-    call med_phases_history_write_hfile(gcomp, 'lnd', 'alarm_history_avg_lnd', .true., rc)
-    if (ChkErr(rc,__LINE__,u_FILE_u)) return
-    call t_stopf('MED:'//subname)
-  end subroutine med_phases_history_write_lnd_avg
-
-  subroutine med_phases_history_write_lnd_aux(gcomp, rc)
-    ! Write mediator history file for lnd variables
-    ! input/output variables
-    type(ESMF_GridComp)  :: gcomp
-    integer, intent(out) :: rc
-    ! local variables
-    integer :: n
-    character(len=*), parameter :: subname='(med_phases_history_write_lnd_aux)'
-    !---------------------------------------
-    rc = ESMF_SUCCESS
-    call t_startf('MED:'//subname)
-    do n = 1,num_auxfiles(complnd)
-       call med_phases_history_write_hfileaux(gcomp, case_name, inst_tag, n, complnd, auxfiles(complnd,n), rc=rc)
-       if (ChkErr(rc,__LINE__,u_FILE_u)) return
-    end do
-    call t_stopf('MED:'//subname)
-  end subroutine med_phases_history_write_lnd_aux
-
-  !===============================================================================
-  subroutine med_phases_history_write_ocn_inst(gcomp, rc)
-    ! Write mediator history file for ocn variables
-    ! input/output variables
-    type(ESMF_GridComp)  :: gcomp
-    integer, intent(out) :: rc
-    ! local variables
-    character(len=*), parameter :: subname='(med_phases_history_write_ocn_inst)'
-    !---------------------------------------
-    rc = ESMF_SUCCESS
-    call t_startf('MED:'//subname)
-    call med_phases_history_write_hfile(gcomp, 'ocn', 'alarm_history_inst_ocn', .false., rc)
-    if (ChkErr(rc,__LINE__,u_FILE_u)) return
-    call t_stopf('MED:'//subname)
-  end subroutine med_phases_history_write_ocn_inst
-
-  subroutine med_phases_history_write_ocn_avg(gcomp, rc)
-    ! Write mediator history file for ocn variables
-    ! input/output variables
-    type(ESMF_GridComp)  :: gcomp
-    integer, intent(out) :: rc
-    ! local variables
-    character(len=*), parameter :: subname='(med_phases_history_write_ocn_avg)'
-    !---------------------------------------
-    rc = ESMF_SUCCESS
-    call t_startf('MED:'//subname)
-    call med_phases_history_write_hfile(gcomp, 'ocn', 'alarm_history_avg_ocn', .true., rc)
-    if (ChkErr(rc,__LINE__,u_FILE_u)) return
-    call t_stopf('MED:'//subname)
-  end subroutine med_phases_history_write_ocn_avg
-
-  subroutine med_phases_history_write_ocn_aux(gcomp, rc)
-    ! Write mediator history file for ocn variables
-    ! input/output variables
-    type(ESMF_GridComp)  :: gcomp
-    integer, intent(out) :: rc
-    ! local variables
-    integer :: n
-    character(len=*), parameter :: subname='(med_phases_history_write_ocn_aux)'
-    !---------------------------------------
-    rc = ESMF_SUCCESS
-    call t_startf('MED:'//subname)
-    do n = 1,num_auxfiles(compocn)
-       call med_phases_history_write_hfileaux(gcomp, case_name, inst_tag, n, compocn, auxfiles(compocn,n), rc=rc)
-       if (ChkErr(rc,__LINE__,u_FILE_u)) return
-    end do
-    call t_stopf('MED:'//subname)
-  end subroutine med_phases_history_write_ocn_aux
-
-  !===============================================================================
-  subroutine med_phases_history_write_rof_inst(gcomp, rc)
-    ! Write mediator history file for rof variables
-    ! input/output variables
-    type(ESMF_GridComp)  :: gcomp
-    integer, intent(out) :: rc
-    ! local variables
-    character(len=*), parameter :: subname='(med_phases_history_write_rof_inst)'
-    !---------------------------------------
-    rc = ESMF_SUCCESS
-    call t_startf('MED:'//subname)
-    call med_phases_history_write_hfile(gcomp, 'rof', 'alarm_history_inst_rof', .false., rc)
-    if (ChkErr(rc,__LINE__,u_FILE_u)) return
-    call t_stopf('MED:'//subname)
-  end subroutine med_phases_history_write_rof_inst
-
-  subroutine med_phases_history_write_rof_avg(gcomp, rc)
-    ! Write mediator history file for rof variables
-    ! input/output variables
-    type(ESMF_GridComp)  :: gcomp
-    integer, intent(out) :: rc
-    ! local variables
-    character(len=*), parameter :: subname='(med_phases_history_write_rof_avg)'
-    !---------------------------------------
-    rc = ESMF_SUCCESS
-    call t_startf('MED:'//subname)
-    call med_phases_history_write_hfile(gcomp, 'rof', 'alarm_history_avg_rof', .true., rc)
-    if (ChkErr(rc,__LINE__,u_FILE_u)) return
-    call t_stopf('MED:'//subname)
-  end subroutine med_phases_history_write_rof_avg
-
-  subroutine med_phases_history_write_rof_aux(gcomp, rc)
-    ! Write mediator history file for rof variables
-    ! input/output variables
-    type(ESMF_GridComp)  :: gcomp
-    integer, intent(out) :: rc
-    ! local variables
-    integer :: n
-    character(len=*), parameter :: subname='(med_phases_history_write_rof_aux)'
-    !---------------------------------------
-    rc = ESMF_SUCCESS
-    call t_startf('MED:'//subname)
-    do n = 1,num_auxfiles(comprof)
-       call med_phases_history_write_hfileaux(gcomp, case_name, inst_tag, n, comprof, auxfiles(comprof,n), rc=rc)
-       if (ChkErr(rc,__LINE__,u_FILE_u)) return
-    end do
-    call t_stopf('MED:'//subname)
-  end subroutine med_phases_history_write_rof_aux
-
-  !===============================================================================
-  subroutine med_phases_history_write_wav_inst(gcomp, rc)
-    ! Write mediator history file for wav variables
-    ! input/output variables
-    type(ESMF_GridComp)  :: gcomp
-    integer, intent(out) :: rc
-    ! local variables
-    character(len=*), parameter :: subname='(med_phases_history_write_wav_inst)'
-    !---------------------------------------
-    rc = ESMF_SUCCESS
-    call t_startf('MED:'//subname)
-    call med_phases_history_write_hfile(gcomp, 'wav', 'alarm_history_inst_wav', .false., rc)
-    if (ChkErr(rc,__LINE__,u_FILE_u)) return
-    call t_stopf('MED:'//subname)
-  end subroutine med_phases_history_write_wav_inst
-
-  subroutine med_phases_history_write_wav_avg(gcomp, rc)
-    ! Write mediator history file for wav variables
-    ! input/output variables
-    type(ESMF_GridComp)  :: gcomp
-    integer, intent(out) :: rc
-    ! local variables
-    character(len=*), parameter :: subname='(med_phases_history_write_wav_avg)'
-    !---------------------------------------
-    rc = ESMF_SUCCESS
-    call t_startf('MED:'//subname)
-    call med_phases_history_write_hfile(gcomp, 'wav', 'alarm_history_avg_wav', .true., rc)
-    if (ChkErr(rc,__LINE__,u_FILE_u)) return
-    call t_stopf('MED:'//subname)
-  end subroutine med_phases_history_write_wav_avg
-
-  subroutine med_phases_history_write_wav_aux(gcomp, rc)
-    ! Write mediator history file for wav variables
-    ! input/output variables
-    type(ESMF_GridComp)  :: gcomp
-    integer, intent(out) :: rc
-    ! local variables
-    integer :: n
-    character(len=*), parameter :: subname='(med_phases_history_write_wav_aux)'
-    !---------------------------------------
-    rc = ESMF_SUCCESS
-    call t_startf('MED:'//subname)
-    do n = 1,num_auxfiles(compwav)
-       call med_phases_history_write_hfileaux(gcomp, case_name, inst_tag, n, compwav, auxfiles(compwav,n), rc=rc)
-       if (ChkErr(rc,__LINE__,u_FILE_u)) return
-    end do
-    call t_stopf('MED:'//subname)
-  end subroutine med_phases_history_write_wav_aux
-
-  !===============================================================================
-  subroutine med_phases_history_write_hfile(gcomp, comptype, alarmname, doavg, rc)
+  subroutine med_phases_history_write_hfile(gcomp, comptype, hclock, alarmname, doavg, rc)
 
     ! input/output variables
     type(ESMF_GridComp) , intent(inout) :: gcomp
     character(len=*)    , intent(in)    :: comptype
+    type(ESMF_Clock)    , intent(in)    :: hclock
     character(len=*)    , intent(in)    :: alarmname
     logical             , intent(in)    :: doavg
     integer             , intent(out)   :: rc
@@ -956,16 +628,17 @@ contains
     if (ChkErr(rc,__LINE__,u_FILE_u)) return
 
     ! Get the history file alarm and determine if alarm is ringing
-    call NUOPC_ModelGet(gcomp, modelClock=mclock,  rc=rc)
+    ! call NUOPC_ModelGet(gcomp, modelClock=mclock,  rc=rc)
+    ! if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    call ESMF_ClockGetAlarm(hclock, alarmname=trim(alarmname), alarm=alarm, rc=rc)
     if (ChkErr(rc,__LINE__,u_FILE_u)) return
-    call ESMF_ClockGetAlarm(mclock, alarmname=trim(alarmname), alarm=alarm, rc=rc)
-    if (ChkErr(rc,__LINE__,u_FILE_u)) return
+
     if (ESMF_AlarmIsRinging(alarm, rc=rc)) then
        if (ChkErr(rc,__LINE__,u_FILE_u)) return
        if (debug_alarms) then
-         call med_phases_history_output_alarminfo(mclock, alarm, alarmname, rc)
-         if (ChkErr(rc,__LINE__,u_FILE_u)) return
-      end if
+          call med_phases_history_output_alarminfo(hclock, alarm, alarmname, rc)
+          if (ChkErr(rc,__LINE__,u_FILE_u)) return
+       end if
        ! Set write_now flag
        write_now = .true.
        ! Turn ringer off
@@ -1015,9 +688,9 @@ contains
 
        ! Set tbnds and avg_time if doing averaging
        if (doavg) then
-          call ESMF_ClockGet(mclock, currtime=currtime, starttime=starttime, rc=rc)
+          call ESMF_ClockGet(hclock, currtime=currtime, starttime=starttime, rc=rc)
           if (ChkErr(rc,__LINE__,u_FILE_u)) return
-          call ESMF_ClockGetNextTime(mclock, nextTime=nexttime, rc=rc)
+          call ESMF_ClockGetNextTime(hclock, nextTime=nexttime, rc=rc)
           if (ChkErr(rc,__LINE__,u_FILE_u)) return
           call ESMF_AlarmGet(alarm, ringInterval=ringInterval, rc=rc)
           if (ChkErr(rc,__LINE__,u_FILE_u)) return
@@ -1043,7 +716,7 @@ contains
           end if
 
           ! Write time values (tbnds does not appear in instantaneous output)
-          call ESMF_ClockGet(mclock, calendar=calendar, rc=rc)
+          call ESMF_ClockGet(hclock, calendar=calendar, rc=rc)
           if (ChkErr(rc,__LINE__,u_FILE_u)) return
           if (doavg) then
              call med_io_write(hist_file, iam, time_units=time_units, calendar=calendar, time_val=avg_time, &
@@ -1195,13 +868,11 @@ contains
     ! Determine time info
     ! Use nexttime rather than currtime for the time difference form
     ! start since that is the time at the end of the time step
-    call NUOPC_ModelGet(gcomp, modelClock=mclock,  rc=rc)
+    call ESMF_ClockGet(auxfile%hclock, currtime=currtime, starttime=starttime, calendar=calendar, rc=rc)
     if (ChkErr(rc,__LINE__,u_FILE_u)) return
-    call ESMF_ClockGet(mclock, currtime=currtime, starttime=starttime, calendar=calendar, rc=rc)
+    call ESMF_ClockGetNextTime(auxfile%hclock, nextTime=nexttime, rc=rc)
     if (ChkErr(rc,__LINE__,u_FILE_u)) return
-    call ESMF_ClockGetNextTime(mclock, nextTime=nexttime, rc=rc)
-    if (ChkErr(rc,__LINE__,u_FILE_u)) return
-    call ESMF_ClockGetAlarm(mclock, alarmname=trim(auxfile%alarmname), alarm=alarm, rc=rc)
+    call ESMF_ClockGetAlarm(auxfile%hclock, alarmname=trim(auxfile%alarmname), alarm=alarm, rc=rc)
     if (ChkErr(rc,__LINE__,u_FILE_u)) return
     call ESMF_AlarmGet(alarm, ringInterval=ringInterval, rc=rc)
     if (ChkErr(rc,__LINE__,u_FILE_u)) return
@@ -1213,13 +884,30 @@ contains
     if (ChkErr(rc,__LINE__,u_FILE_u)) return
     avg_time = 0.5_r8 * (tbnds(1) + tbnds(2))
 
+    if (mastertask .and. debug_alarms) then
+       if (ESMF_AlarmIsRinging(alarm, rc=rc)) then
+          write(logunit,'(a)')' alarmname = '//trim(auxfile%alarmname)//' is ringing'
+       else
+          write(logunit,'(a)')' alarmname = '//trim(auxfile%alarmname)//' is not ringing'
+       end if
+       call ESMF_TimeGet(nexttime, yy=yr, mm=mon, dd=day, s=sec, rc=rc)
+       if (ChkErr(rc,__LINE__,u_FILE_u)) return
+       write(logunit,'(a,4(i6,2x))')' nexttime is ',yr,mon,day,sec
+       call ESMF_TimeGet(currtime, yy=yr, mm=mon, dd=day, s=sec, rc=rc)
+       if (ChkErr(rc,__LINE__,u_FILE_u)) return
+       write(logunit,'(a,4(i6,2x))')' currtime is ',yr,mon,day,sec
+       call ESMF_TimeGet(starttime, yy=yr, mm=mon, dd=day, s=sec, rc=rc)
+       if (ChkErr(rc,__LINE__,u_FILE_u)) return
+       write(logunit,'(a,4(i6,2x))')' starttime is ',yr,mon,day,sec
+    end if
+
     write_now = .false.
     if (ESMF_AlarmIsRinging(alarm, rc=rc)) then
        write_now = .true.
        call ESMF_AlarmRingerOff( alarm, rc=rc )
        if (ChkErr(rc,__LINE__,u_FILE_u)) return
        if (debug_alarms) then
-          call med_phases_history_output_alarminfo(mclock, alarm, auxfile%alarmname, rc)
+          call med_phases_history_output_alarminfo(auxfile%hclock, alarm, auxfile%alarmname, rc)
           if (ChkErr(rc,__LINE__,u_FILE_u)) return
        end if
     end if
@@ -1251,7 +939,7 @@ contains
        if (auxfile%nt == 1) then
 
           ! determine history file name
-          call ESMF_ClockGet(mclock, currtime=currtime, rc=rc)
+          call ESMF_ClockGet(auxfile%hclock, currtime=currtime, rc=rc)
           if (ChkErr(rc,__LINE__,u_FILE_u)) return
           call ESMF_TimeGet(currtime,yy=yr, mm=mon, dd=day, s=sec, rc=rc)
           if (ChkErr(rc,__LINE__,u_FILE_u)) return
@@ -1315,6 +1003,567 @@ contains
     end if ! end of write_now if-block
 
   end subroutine med_phases_history_write_hfileaux
+
+  !===============================================================================
+  subroutine med_phases_history_write_inst_all(gcomp, rc)
+    ! --------------------------------------
+    ! Write mediator history file for all variables
+    ! This is a phase called by the run sequence
+    ! --------------------------------------
+    ! input/output variables
+    type(ESMF_GridComp)  :: gcomp
+    integer, intent(out) :: rc
+
+    ! local variables
+    logical :: first_time = .true.
+    character(len=*), parameter :: subname='(med_phases_history_write)'
+    !---------------------------------------
+    rc = ESMF_SUCCESS
+    call t_startf('MED:'//subname)
+    if (first_time) then
+       call med_phases_history_init_inst(gcomp, 'alarm_history_inst_all', hclock_inst_all, rc=rc)
+       if (ChkErr(rc,__LINE__,u_FILE_u)) return
+       first_time = .false.
+    end if
+    call ESMF_ClockAdvance(hclock_inst_all, rc=rc)
+    if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    call med_phases_history_write_hfile(gcomp, 'all', hclock_inst_all, &
+         'alarm_history_inst_all', .false., rc)
+    if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    call t_stopf('MED:'//subname)
+  end subroutine med_phases_history_write_inst_all
+
+  subroutine med_phases_history_write_inst_med(gcomp, rc)
+    ! Write mediator history file for med variables - only instantaneous files are written
+    ! This writes out ocean albedoes and atm/ocean fluxes computed by the mediator
+    ! along with the fractions computed by the mediator
+    ! input/output variables
+    type(ESMF_GridComp)  :: gcomp
+    integer, intent(out) :: rc
+    ! local variables
+    logical :: first_time = .true.
+    character(CL) :: alarmname
+    character(len=*), parameter :: subname='(med_phases_history_write_med)'
+    !---------------------------------------
+    rc = ESMF_SUCCESS
+    call t_startf('MED:'//subname)
+    alarmname =  'alarm_history_inst_'//trim(compname(compmed))
+    if (first_time) then
+       call med_phases_history_init_inst(gcomp, trim(alarmname), hclock_inst_comp(compmed), rc=rc)
+       if (ChkErr(rc,__LINE__,u_FILE_u)) return
+       first_time = .false.
+    end if
+    call ESMF_ClockAdvance(hclock_inst_comp(compmed), rc=rc)
+    if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    call med_phases_history_write_hfile(gcomp, trim(compname(compmed)), hclock_inst_comp(compmed), &
+         trim(alarmname), .false., rc)
+    if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    call t_stopf('MED:'//subname)
+  end subroutine med_phases_history_write_inst_med
+
+  subroutine med_phases_history_write_inst_atm(gcomp, rc)
+    ! Write mediator history file for atm variables
+    ! input/output variables
+    type(ESMF_GridComp)  :: gcomp
+    integer, intent(out) :: rc
+    ! local variables
+    logical       :: first_time = .true.
+    character(CL) :: alarmname
+    character(len=*), parameter :: subname='(med_phases_history_write_inst_atm)'
+    !---------------------------------------
+    rc = ESMF_SUCCESS
+    call t_startf('MED:'//subname)
+    alarmname =  'alarm_history_inst_'//trim(compname(compatm))
+    if (first_time) then
+       call med_phases_history_init_inst(gcomp, trim(alarmname), hclock_inst_comp(compatm), rc=rc)
+       if (ChkErr(rc,__LINE__,u_FILE_u)) return
+       first_time = .false.
+    end if
+    call ESMF_ClockAdvance(hclock_inst_comp(compatm), rc=rc)
+    if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    call med_phases_history_write_hfile(gcomp, trim(compname(compatm)), hclock_inst_comp(compatm), &
+         trim(alarmname), .false., rc)
+    if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    call t_stopf('MED:'//subname)
+  end subroutine med_phases_history_write_inst_atm
+
+  subroutine med_phases_history_write_inst_ice(gcomp, rc)
+    ! Write mediator history file for ice variables
+    ! input/output variables
+    type(ESMF_GridComp)  :: gcomp
+    integer, intent(out) :: rc
+    ! local variables
+    logical       :: first_time = .true.
+    character(CL) :: alarmname
+    character(len=*), parameter :: subname='(med_phases_history_write_inst_ice)'
+    !---------------------------------------
+    rc = ESMF_SUCCESS
+    call t_startf('MED:'//subname)
+    alarmname =  'alarm_history_inst_'//trim(compname(compice))
+    if (first_time) then
+       call med_phases_history_init_inst(gcomp, trim(alarmname), hclock_inst_comp(compice), rc=rc)
+       if (ChkErr(rc,__LINE__,u_FILE_u)) return
+       first_time = .false.
+    end if
+    call ESMF_ClockAdvance(hclock_inst_comp(compice), rc=rc)
+    if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    call med_phases_history_write_hfile(gcomp, trim(compname(compice)), hclock_inst_comp(compice),&
+         trim(alarmname), .false., rc)
+    call t_stopf('MED:'//subname)
+  end subroutine med_phases_history_write_inst_ice
+
+  subroutine med_phases_history_write_inst_glc(gcomp, rc)
+    ! Write mediator history file for glc variables
+    ! input/output variables
+    type(ESMF_GridComp)  :: gcomp
+    integer, intent(out) :: rc
+    ! local variables
+    logical       :: first_time = .true.
+    character(CL) :: alarmname
+    character(len=*), parameter :: subname='(med_phases_history_write_inst_glc)'
+    !---------------------------------------
+    rc = ESMF_SUCCESS
+    call t_startf('MED:'//subname)
+    alarmname =  'alarm_history_inst_'//trim(compname(compglc))
+    if (first_time) then
+       call med_phases_history_init_inst(gcomp, trim(alarmname), hclock_inst_comp(compglc), rc=rc)
+       if (ChkErr(rc,__LINE__,u_FILE_u)) return
+       first_time = .false.
+    end if
+    call ESMF_ClockAdvance(hclock_inst_comp(compglc), rc=rc)
+    if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    call med_phases_history_write_hfile(gcomp, trim(compname(compglc)), hclock_inst_comp(compglc), &
+         trim(alarmname), .false., rc)
+    if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    call t_stopf('MED:'//subname)
+  end subroutine med_phases_history_write_inst_glc
+
+  subroutine med_phases_history_write_inst_lnd(gcomp, rc)
+    ! Write mediator history file for lnd variables
+    ! input/output variables
+    type(ESMF_GridComp)  :: gcomp
+    integer, intent(out) :: rc
+    ! local variables
+    logical       :: first_time = .true.
+    character(CL) :: alarmname
+    character(len=*), parameter :: subname='(med_phases_history_write_inst_lnd)'
+    !---------------------------------------
+    rc = ESMF_SUCCESS
+    call t_startf('MED:'//subname)
+    alarmname =  'alarm_history_inst_'//trim(compname(complnd))
+    if (first_time) then
+       call med_phases_history_init_inst(gcomp, trim(alarmname), hclock_inst_comp(complnd), rc=rc)
+       if (ChkErr(rc,__LINE__,u_FILE_u)) return
+       first_time = .false.
+    end if
+    call ESMF_ClockAdvance(hclock_inst_comp(complnd), rc=rc)
+    if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    call med_phases_history_write_hfile(gcomp, trim(compname(complnd)), hclock_inst_comp(complnd), &
+         trim(alarmname), .false., rc)
+    if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    call t_stopf('MED:'//subname)
+  end subroutine med_phases_history_write_inst_lnd
+
+  subroutine med_phases_history_write_inst_ocn(gcomp, rc)
+    ! Write mediator history file for ocn variables
+    ! input/output variables
+    type(ESMF_GridComp)  :: gcomp
+    integer, intent(out) :: rc
+    ! local variables
+    logical       :: first_time = .true.
+    character(CL) :: alarmname
+    character(len=*), parameter :: subname='(med_phases_history_write_inst_ocn)'
+    !---------------------------------------
+    rc = ESMF_SUCCESS
+    call t_startf('MED:'//subname)
+    alarmname =  'alarm_history_inst_'//trim(compname(compocn))
+    if (first_time) then
+       call med_phases_history_init_inst(gcomp, trim(alarmname), hclock_inst_comp(compocn), rc=rc)
+       if (ChkErr(rc,__LINE__,u_FILE_u)) return
+       first_time = .false.
+    end if
+    call ESMF_ClockAdvance(hclock_inst_comp(compocn), rc=rc)
+    if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    call med_phases_history_write_hfile(gcomp, trim(compname(compocn)), hclock_inst_comp(compocn), &
+         trim(alarmname), .false., rc)
+    if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    call t_stopf('MED:'//subname)
+  end subroutine med_phases_history_write_inst_ocn
+
+  subroutine med_phases_history_write_inst_rof(gcomp, rc)
+    ! Write mediator history file for rof variables
+    ! input/output variables
+    type(ESMF_GridComp)  :: gcomp
+    integer, intent(out) :: rc
+    ! local variables
+    logical       :: first_time = .true.
+    character(CL) :: alarmname
+    character(len=*), parameter :: subname='(med_phases_history_write_inst_rof)'
+    !---------------------------------------
+    rc = ESMF_SUCCESS
+    call t_startf('MED:'//subname)
+    alarmname =  'alarm_history_inst_'//trim(compname(comprof))
+    if (first_time) then
+       call med_phases_history_init_inst(gcomp, trim(alarmname), hclock_inst_comp(comprof), rc=rc)
+       if (ChkErr(rc,__LINE__,u_FILE_u)) return
+       first_time = .false.
+    end if
+    call ESMF_ClockAdvance(hclock_inst_comp(comprof), rc=rc)
+    if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    call med_phases_history_write_hfile(gcomp, trim(compname(comprof)), hclock_inst_comp(comprof), &
+         trim(alarmname), .false., rc)
+    if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    call t_stopf('MED:'//subname)
+  end subroutine med_phases_history_write_inst_rof
+
+  subroutine med_phases_history_write_inst_wav(gcomp, rc)
+    ! Write mediator history file for wav variables
+    ! input/output variables
+    type(ESMF_GridComp)  :: gcomp
+    integer, intent(out) :: rc
+    ! local variables
+    logical       :: first_time = .true.
+    character(CL) :: alarmname
+    character(len=*), parameter :: subname='(med_phases_history_write_inst_wav)'
+    !---------------------------------------
+    rc = ESMF_SUCCESS
+    call t_startf('MED:'//subname)
+    alarmname =  'alarm_history_inst_'//trim(compname(compwav))
+    if (first_time) then
+       call med_phases_history_init_inst(gcomp, trim(alarmname), hclock_inst_comp(compwav), rc=rc)
+       if (ChkErr(rc,__LINE__,u_FILE_u)) return
+       first_time = .false.
+    end if
+    call ESMF_ClockAdvance(hclock_inst_comp(compwav), rc=rc)
+    if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    call med_phases_history_write_hfile(gcomp, trim(compname(compwav)), hclock_inst_comp(compwav), &
+         trim(alarmname), .false., rc)
+    if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    call t_stopf('MED:'//subname)
+    rc = ESMF_SUCCESS
+  end subroutine med_phases_history_write_inst_wav
+
+  !===============================================================================
+  subroutine med_phases_history_write_avg_atm(gcomp, rc)
+    ! Write mediator history file for atm variables
+    ! input/output variables
+    type(ESMF_GridComp)  :: gcomp
+    integer, intent(out) :: rc
+    ! local variables
+    integer :: n
+    character(len=*), parameter :: subname='(med_phases_history_write_avg_atm)'
+    !---------------------------------------
+    rc = ESMF_SUCCESS
+    call t_startf('MED:'//subname)
+    call med_phases_history_write_hfile(gcomp, 'atm', hclock_avg_comp(compatm), &
+         'alarm_history_avg_atm', .true., rc)
+    if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    call t_stopf('MED:'//subname)
+  end subroutine med_phases_history_write_avg_atm
+
+  subroutine med_phases_history_write_avg_ice(gcomp, rc)
+    ! Write mediator history file for ice variables
+    ! input/output variables
+    type(ESMF_GridComp)  :: gcomp
+    integer, intent(out) :: rc
+    ! local variables
+    character(len=*), parameter :: subname='(med_phases_history_write_avg_ice)'
+    !---------------------------------------
+    rc = ESMF_SUCCESS
+    call t_startf('MED:'//subname)
+    call med_phases_history_write_hfile(gcomp, 'ice', hclock_avg_comp(compice), &
+         'alarm_history_avg_ice', .true., rc)
+    if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    call t_stopf('MED:'//subname)
+  end subroutine med_phases_history_write_avg_ice
+
+  subroutine med_phases_history_write_avg_glc(gcomp, rc)
+    ! Write mediator history file for glc variables
+    ! input/output variables
+    type(ESMF_GridComp)  :: gcomp
+    integer, intent(out) :: rc
+    ! local variables
+    character(len=*), parameter :: subname='(med_phases_history_write_avg_glc)'
+    !---------------------------------------
+    rc = ESMF_SUCCESS
+    call t_startf('MED:'//subname)
+    call med_phases_history_write_hfile(gcomp, 'glc', hclock_avg_comp(compglc), &
+         'alarm_history_avg_glc', .true., rc)
+    if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    call t_stopf('MED:'//subname)
+  end subroutine med_phases_history_write_avg_glc
+
+  subroutine med_phases_history_write_avg_lnd(gcomp, rc)
+    ! Write mediator history file for lnd variables
+    ! input/output variables
+    type(ESMF_GridComp)  :: gcomp
+    integer, intent(out) :: rc
+    ! local variables
+    character(len=*), parameter :: subname='(med_phases_history_write_avg_lnd)'
+    !---------------------------------------
+    rc = ESMF_SUCCESS
+    call t_startf('MED:'//subname)
+    call med_phases_history_write_hfile(gcomp, 'lnd', hclock_avg_comp(complnd), &
+         'alarm_history_avg_lnd', .true., rc)
+    if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    call t_stopf('MED:'//subname)
+  end subroutine med_phases_history_write_avg_lnd
+
+  subroutine med_phases_history_write_avg_ocn(gcomp, rc)
+    ! Write mediator history file for ocn variables
+    ! input/output variables
+    type(ESMF_GridComp)  :: gcomp
+    integer, intent(out) :: rc
+    ! local variables
+    character(len=*), parameter :: subname='(med_phases_history_write_avg_ocn)'
+    !---------------------------------------
+    rc = ESMF_SUCCESS
+    call t_startf('MED:'//subname)
+    call med_phases_history_write_hfile(gcomp, 'ocn', hclock_avg_comp(compocn), &
+         'alarm_history_avg_ocn', .true., rc)
+    if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    call t_stopf('MED:'//subname)
+  end subroutine med_phases_history_write_avg_ocn
+
+  subroutine med_phases_history_write_avg_rof(gcomp, rc)
+    ! Write mediator history file for rof variables
+    ! input/output variables
+    type(ESMF_GridComp)  :: gcomp
+    integer, intent(out) :: rc
+    ! local variables
+    character(len=*), parameter :: subname='(med_phases_history_write_avg_rof)'
+    !---------------------------------------
+    rc = ESMF_SUCCESS
+    call t_startf('MED:'//subname)
+    call med_phases_history_write_hfile(gcomp, 'rof', hclock_avg_comp(comprof), &
+         'alarm_history_avg_rof', .true., rc)
+    if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    call t_stopf('MED:'//subname)
+  end subroutine med_phases_history_write_avg_rof
+
+  subroutine med_phases_history_write_avg_wav(gcomp, rc)
+    ! Write mediator history file for wav variables
+
+    ! input/output variables
+    type(ESMF_GridComp)  :: gcomp
+    integer, intent(out) :: rc
+
+    ! local variables
+    logical       :: first_time = .true.
+    character(CL) :: alarmname
+    character(len=*), parameter :: subname='(med_phases_history_write_avg_wav)'
+    !---------------------------------------
+    rc = ESMF_SUCCESS
+    call t_startf('MED:'//subname)
+    call med_phases_history_write_hfile(gcomp, 'wav', hclock_avg_comp(compwav), &
+         'alarm_history_avg_wav', .true., rc)
+    if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    call t_stopf('MED:'//subname)
+  end subroutine med_phases_history_write_avg_wav
+
+  !===============================================================================
+  subroutine med_phases_history_write_aux_atm(gcomp, rc)
+    ! Write mediator history file for atm variables
+    ! input/output variables
+    type(ESMF_GridComp)  :: gcomp
+    integer, intent(out) :: rc
+    ! local variables
+    logical :: first_time = .true.
+    integer :: n
+    character(len=*), parameter :: subname='(med_phases_history_write_aux_atm)'
+    !---------------------------------------
+    rc = ESMF_SUCCESS
+    call t_startf('MED:'//subname)
+    if (first_time) then
+       if (mastertask) then
+          write(logunit,'(a)') trim(subname) // 'Initialize auxiliary history file and alarms for atm'
+       end if
+       call med_phases_history_init_aux(gcomp, compatm, auxfiles(:,compatm), rc=rc)
+       if (ChkErr(rc,__LINE__,u_FILE_u)) return
+       first_time = .false.
+    end if
+    do n = 1,num_auxfiles(compatm)
+       call ESMF_ClockAdvance(auxfiles(n,compatm)%hclock, rc=rc)
+       if (ChkErr(rc,__LINE__,u_FILE_u)) return
+       call med_phases_history_write_hfileaux(gcomp, case_name, inst_tag, n, compatm, auxfiles(n,compatm), rc=rc)
+       if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    end do
+    call t_stopf('MED:'//subname)
+  end subroutine med_phases_history_write_aux_atm
+
+  subroutine med_phases_history_write_aux_ice(gcomp, rc)
+    ! Write mediator history file for ice variables
+    ! input/output variables
+    type(ESMF_GridComp)  :: gcomp
+    integer, intent(out) :: rc
+    ! local variables
+    logical :: first_time = .true.
+    integer :: n
+    character(len=*), parameter :: subname='(med_phases_history_write_aux_ice)'
+    !---------------------------------------
+    rc = ESMF_SUCCESS
+    call t_startf('MED:'//subname)
+    if (first_time) then
+       if (mastertask) then
+          write(logunit,'(a)') trim(subname) // 'Initialize auxiliary history file and alarms for ice'
+       end if
+       call med_phases_history_init_aux(gcomp, compice, auxfiles(:,compice), rc=rc)
+       if (ChkErr(rc,__LINE__,u_FILE_u)) return
+       first_time = .false.
+    end if
+    do n = 1,num_auxfiles(compice)
+       call ESMF_ClockAdvance(auxfiles(n,compice)%hclock, rc=rc)
+       if (ChkErr(rc,__LINE__,u_FILE_u)) return
+       call med_phases_history_write_hfileaux(gcomp, case_name, inst_tag, n, compice, auxfiles(n,compice), rc=rc)
+       if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    end do
+    call t_stopf('MED:'//subname)
+  end subroutine med_phases_history_write_aux_ice
+
+  subroutine med_phases_history_write_aux_glc(gcomp, rc)
+    ! Write mediator history file for glc variables
+    ! input/output variables
+    type(ESMF_GridComp)  :: gcomp
+    integer, intent(out) :: rc
+    ! local variables
+    logical :: first_time = .true.
+    integer :: n
+    character(len=*), parameter :: subname='(med_phases_history_write_aux_glc)'
+    !---------------------------------------
+    rc = ESMF_SUCCESS
+    call t_startf('MED:'//subname)
+    if (first_time) then
+       if (mastertask) then
+          write(logunit,'(a)') trim(subname) // 'Initialize auxiliary history file and alarms for glc'
+       end if
+       call med_phases_history_init_aux(gcomp, compglc, auxfiles(:,compglc), rc=rc)
+       if (ChkErr(rc,__LINE__,u_FILE_u)) return
+       first_time = .false.
+    end if
+    do n = 1,num_auxfiles(compglc)
+       call ESMF_ClockAdvance(auxfiles(n,compglc)%hclock, rc=rc)
+       if (ChkErr(rc,__LINE__,u_FILE_u)) return
+       call med_phases_history_write_hfileaux(gcomp, case_name, inst_tag, n, compglc, auxfiles(n,compglc), rc=rc)
+       if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    end do
+    call t_stopf('MED:'//subname)
+  end subroutine med_phases_history_write_aux_glc
+
+  subroutine med_phases_history_write_aux_lnd(gcomp, rc)
+    ! Write mediator history file for lnd variables
+    ! input/output variables
+    type(ESMF_GridComp)  :: gcomp
+    integer, intent(out) :: rc
+    ! local variables
+    logical :: first_time = .true.
+    integer :: n
+    character(len=*), parameter :: subname='(med_phases_history_write_aux_lnd)'
+    !---------------------------------------
+    rc = ESMF_SUCCESS
+    call t_startf('MED:'//subname)
+    if (first_time) then
+       if (mastertask) then
+          write(logunit,'(a)') trim(subname) // 'Initialize auxiliary history file and alarms for lnd'
+       end if
+       call med_phases_history_init_aux(gcomp, complnd, auxfiles(:,complnd), rc=rc)
+       if (ChkErr(rc,__LINE__,u_FILE_u)) return
+       first_time = .false.
+    end if
+    do n = 1,num_auxfiles(complnd)
+       call ESMF_ClockAdvance(auxfiles(n,complnd)%hclock, rc=rc)
+       if (ChkErr(rc,__LINE__,u_FILE_u)) return
+       call med_phases_history_write_hfileaux(gcomp, case_name, inst_tag, n, complnd, auxfiles(n,complnd), rc=rc)
+       if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    end do
+    call t_stopf('MED:'//subname)
+  end subroutine med_phases_history_write_aux_lnd
+
+  subroutine med_phases_history_write_aux_ocn(gcomp, rc)
+    ! Write mediator history file for ocn variables
+    ! input/output variables
+    type(ESMF_GridComp)  :: gcomp
+    integer, intent(out) :: rc
+    ! local variables
+    logical :: first_time = .true.
+    integer :: n
+    character(len=*), parameter :: subname='(med_phases_history_write_aux_ocn)'
+    !---------------------------------------
+    rc = ESMF_SUCCESS
+    call t_startf('MED:'//subname)
+    if (first_time) then
+       if (mastertask) then
+          write(logunit,'(a)') trim(subname) // 'Initialize auxiliary history file and alarms for ocn'
+       end if
+       call med_phases_history_init_aux(gcomp, compocn, auxfiles(:,compocn), rc=rc)
+       if (ChkErr(rc,__LINE__,u_FILE_u)) return
+       first_time = .false.
+    end if
+    do n = 1,num_auxfiles(compocn)
+       call ESMF_ClockAdvance(auxfiles(n,compocn)%hclock, rc=rc)
+       if (ChkErr(rc,__LINE__,u_FILE_u)) return
+       call med_phases_history_write_hfileaux(gcomp, case_name, inst_tag, n, compocn, auxfiles(n,compocn), rc=rc)
+       if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    end do
+    call t_stopf('MED:'//subname)
+  end subroutine med_phases_history_write_aux_ocn
+
+  subroutine med_phases_history_write_aux_rof(gcomp, rc)
+    ! Write mediator history file for rof variables
+    ! input/output variables
+    type(ESMF_GridComp)  :: gcomp
+    integer, intent(out) :: rc
+    ! local variables
+    logical :: first_time = .true.
+    integer :: n
+    character(len=*), parameter :: subname='(med_phases_history_write_aux_rof)'
+    !---------------------------------------
+    rc = ESMF_SUCCESS
+    call t_startf('MED:'//subname)
+    if (first_time) then
+       if (mastertask) then
+          write(logunit,'(a)') trim(subname) // 'Initialize auxiliary history file and alarms for rof'
+       end if
+       call med_phases_history_init_aux(gcomp, comprof, auxfiles(:,comprof), rc=rc)
+       if (ChkErr(rc,__LINE__,u_FILE_u)) return
+       first_time = .false.
+    end if
+    do n = 1,num_auxfiles(comprof)
+       call ESMF_ClockAdvance(auxfiles(n,comprof)%hclock, rc=rc)
+       if (ChkErr(rc,__LINE__,u_FILE_u)) return
+       call med_phases_history_write_hfileaux(gcomp, case_name, inst_tag, n, comprof, auxfiles(n,comprof), rc=rc)
+       if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    end do
+    call t_stopf('MED:'//subname)
+  end subroutine med_phases_history_write_aux_rof
+
+  subroutine med_phases_history_write_aux_wav(gcomp, rc)
+    ! Write mediator history file for wav variables
+    ! input/output variables
+    type(ESMF_GridComp)  :: gcomp
+    integer, intent(out) :: rc
+    ! local variables
+    logical :: first_time = .true.
+    integer :: n
+    character(len=*), parameter :: subname='(med_phases_history_write_aux_wav)'
+    !---------------------------------------
+    rc = ESMF_SUCCESS
+    call t_startf('MED:'//subname)
+    if (first_time) then
+       if (mastertask) then
+          write(logunit,'(a)') trim(subname) // 'Initialize auxiliary history file and alarms for wav'
+       end if
+       call med_phases_history_init_aux(gcomp, compwav, auxfiles(:,compwav), rc=rc)
+       if (ChkErr(rc,__LINE__,u_FILE_u)) return
+       first_time = .false.
+    end if
+    do n = 1,num_auxfiles(compwav)
+       call ESMF_ClockAdvance(auxfiles(n,compwav)%hclock, rc=rc)
+       if (ChkErr(rc,__LINE__,u_FILE_u)) return
+       call med_phases_history_write_hfileaux(gcomp, case_name, inst_tag, n, compwav, auxfiles(n,compwav), rc=rc)
+       if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    end do
+    call t_stopf('MED:'//subname)
+  end subroutine med_phases_history_write_aux_wav
 
   !===============================================================================
   subroutine med_phases_history_get_filename(gcomp, doavg, comptype, hist_file, time_units, days_since, rc)
