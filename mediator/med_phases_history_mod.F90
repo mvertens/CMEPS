@@ -874,19 +874,31 @@ contains
     if (ChkErr(rc,__LINE__,u_FILE_u)) return
     call ESMF_ClockGetAlarm(auxfile%hclock, alarmname=trim(auxfile%alarmname), alarm=alarm, rc=rc)
     if (ChkErr(rc,__LINE__,u_FILE_u)) return
-    call ESMF_AlarmGet(alarm, ringInterval=ringInterval, rc=rc)
-    if (ChkErr(rc,__LINE__,u_FILE_u)) return
-    timediff(2) = nexttime - starttime
-    timediff(1) = nexttime - ringinterval - starttime
-    call ESMF_TimeIntervalGet(timediff(2), d_r8=tbnds(2), rc=rc)
-    if (ChkErr(rc,__LINE__,u_FILE_u)) return
-    call ESMF_TimeIntervalGet(timediff(1), d_r8=tbnds(1), rc=rc)
-    if (ChkErr(rc,__LINE__,u_FILE_u)) return
-    avg_time = 0.5_r8 * (tbnds(1) + tbnds(2))
+
+    write_now = .false.
+    if (ESMF_AlarmIsRinging(alarm, rc=rc)) then
+       write_now = .true.
+       call ESMF_AlarmRingerOff( alarm, rc=rc )
+       if (ChkErr(rc,__LINE__,u_FILE_u)) return
+       if (debug_alarms) then
+          call med_phases_history_output_alarminfo(auxfile%hclock, alarm, auxfile%alarmname, rc)
+          if (ChkErr(rc,__LINE__,u_FILE_u)) return
+       end if
+       call ESMF_AlarmGet(alarm, ringInterval=ringInterval, rc=rc)
+       if (ChkErr(rc,__LINE__,u_FILE_u)) return
+       timediff(2) = currtime - starttime
+       timediff(1) = currtime - starttime - ringinterval
+       call ESMF_TimeIntervalGet(timediff(2), d_r8=tbnds(2), rc=rc)
+       if (ChkErr(rc,__LINE__,u_FILE_u)) return
+       call ESMF_TimeIntervalGet(timediff(1), d_r8=tbnds(1), rc=rc)
+       if (ChkErr(rc,__LINE__,u_FILE_u)) return
+       avg_time = 0.5_r8 * (tbnds(1) + tbnds(2))
+    end if
 
     if (mastertask .and. debug_alarms) then
-       if (ESMF_AlarmIsRinging(alarm, rc=rc)) then
+       if (write_now) then
           write(logunit,'(a)')' alarmname = '//trim(auxfile%alarmname)//' is ringing'
+          write(logunit,'(a,f13.5,a,f13.5)')' tbnds(1) = ',tbnds(1),' tbnds(2) = ',tbnds(2)
        else
           write(logunit,'(a)')' alarmname = '//trim(auxfile%alarmname)//' is not ringing'
        end if
@@ -899,17 +911,6 @@ contains
        call ESMF_TimeGet(starttime, yy=yr, mm=mon, dd=day, s=sec, rc=rc)
        if (ChkErr(rc,__LINE__,u_FILE_u)) return
        write(logunit,'(a,4(i6,2x))')' starttime is ',yr,mon,day,sec
-    end if
-
-    write_now = .false.
-    if (ESMF_AlarmIsRinging(alarm, rc=rc)) then
-       write_now = .true.
-       call ESMF_AlarmRingerOff( alarm, rc=rc )
-       if (ChkErr(rc,__LINE__,u_FILE_u)) return
-       if (debug_alarms) then
-          call med_phases_history_output_alarminfo(auxfile%hclock, alarm, auxfile%alarmname, rc)
-          if (ChkErr(rc,__LINE__,u_FILE_u)) return
-       end if
     end if
 
     ! Do accumulation and average if required
