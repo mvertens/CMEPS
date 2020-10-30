@@ -163,7 +163,7 @@ contains
         enddo
 
         call med_methods_FB_diagnose(FB, 'read '//trim(fname), rc)
-	if (present(flag)) flag = .true.
+        if (present(flag)) flag = .true.
       endif
 
     else
@@ -185,19 +185,19 @@ contains
     ! ----------------------------------------------
 
     use ESMF , only : ESMF_Field, ESMF_FieldGet, ESMF_FieldCreate
-    use ESMF , only : ESMF_FieldBundle, ESMF_FieldBundleAdd, ESMF_FieldBundleCreate 
+    use ESMF , only : ESMF_FieldBundle, ESMF_FieldBundleAdd, ESMF_FieldBundleCreate
     use ESMF , only : ESMF_State, ESMF_StateGet, ESMF_Mesh, ESMF_MeshLoc
     use ESMF , only : ESMF_AttributeGet, ESMF_INDEX_DELOCAL
 
     ! input/output variables
     type(ESMF_State)      , intent(in)           :: StateIn          ! input state
-    type(ESMF_FieldBundle), intent(inout)        :: FBout            ! output field bundle 
+    type(ESMF_FieldBundle), intent(inout)        :: FBout            ! output field bundle
     character(len=*)      , intent(in)           :: flds_scalar_name ! name of scalar fields
     character(len=*)      , intent(in)           :: name
     integer               , intent(out)          :: rc
 
     ! local variables
-    logical            :: isPresent 
+    logical            :: isPresent
     integer            :: n,n1
     type(ESMF_Field)   :: lfield
     type(ESMF_Field)   :: newfield
@@ -264,7 +264,7 @@ contains
              if (chkerr(rc,__LINE__,u_FILE_u)) return
              if (ungriddedCount /= 1) then
                 call ESMF_LogWrite(trim(subname)//": ERROR ungriddedCount for "// &
-                     trim(lfieldnamelist(n))//" must be 1 if rank is 2 ", ESMF_LOGMSG_INFO, rc=rc)
+                     trim(lfieldnamelist(n))//" must be 1 if rank is 2 ", ESMF_LOGMSG_INFO)
                 rc = ESMF_FAILURE
                 return
              end if
@@ -296,9 +296,7 @@ contains
              call ESMF_FieldGet(lfield, farrayptr=dataptr1d, rc=rc)
              if (chkerr(rc,__LINE__,u_FILE_u)) return
 
-             ! create new field without an ungridded dimension 
-             call ESMF_LogWrite(trim(subname)// ": creating new field "// &
-                  trim(lfieldnamelist(n)) //" without ungridded dimension", ESMF_LOGMSG_INFO)
+             ! create new field without an ungridded dimension
              newfield = ESMF_FieldCreate(lmesh, dataptr1d, ESMF_INDEX_DELOCAL, &
                   meshloc=meshloc, name=lfieldNameList(n), rc=rc)
              if (chkerr(rc,__LINE__,u_FILE_u)) return
@@ -306,7 +304,7 @@ contains
           else
 
              call ESMF_LogWrite(trim(subname)//": ERROR only rank1 and rank2 are supported for rank of fields ", &
-                  ESMF_LOGMSG_INFO, rc=rc)
+                  ESMF_LOGMSG_INFO)
              rc = ESMF_FAILURE
              return
 
@@ -322,7 +320,7 @@ contains
     deallocate(lfieldNameList)
 
     if (dbug_flag > 5) then
-       call ESMF_LogWrite(trim(subname)//": FBout from input State and field pointers", ESMF_LOGMSG_INFO, rc=rc)
+       call ESMF_LogWrite(trim(subname)//": FBout from input State and field pointers", ESMF_LOGMSG_INFO)
     end if
 
   end subroutine med_methods_FB_init_pointer
@@ -342,7 +340,7 @@ contains
     use ESMF , only : ESMF_TYPEKIND_R8, ESMF_FIELDSTATUS_EMPTY, ESMF_AttributeGet
 
     ! input/output variables
-    type(ESMF_FieldBundle), intent(inout)        :: FBout            ! output field bundle 
+    type(ESMF_FieldBundle), intent(inout)        :: FBout            ! output field bundle
     character(len=*)      , intent(in)           :: flds_scalar_name ! name of scalar fields
     character(len=*)      , intent(in), optional :: fieldNameList(:) ! names of fields to use in output field bundle
     type(ESMF_FieldBundle), intent(in), optional :: FBgeom           ! input field bundle geometry to use
@@ -429,7 +427,7 @@ contains
       allocate(lfieldNameList(fieldcount))
       lfieldNameList = fieldNameList
       if (dbug_flag > 5) then
-         call ESMF_LogWrite(trim(subname)//":"//trim(lname)//" fieldNameList from argument", ESMF_LOGMSG_INFO, rc=rc)
+         call ESMF_LogWrite(trim(subname)//":"//trim(lname)//" fieldNameList from argument", ESMF_LOGMSG_INFO)
       end if
     elseif (present(FBflds)) then
       call ESMF_FieldBundleGet(FBflds, fieldCount=fieldCount, rc=rc)
@@ -438,7 +436,7 @@ contains
       call ESMF_FieldBundleGet(FBflds, fieldNameList=lfieldNameList, rc=rc)
       if (chkerr(rc,__LINE__,u_FILE_u)) return
       if (dbug_flag > 5) then
-         call ESMF_LogWrite(trim(subname)//":"//trim(lname)//" fieldNameList from FBflds", ESMF_LOGMSG_INFO, rc=rc)
+         call ESMF_LogWrite(trim(subname)//":"//trim(lname)//" fieldNameList from FBflds", ESMF_LOGMSG_INFO)
       end if
     elseif (present(STflds)) then
       call ESMF_StateGet(STflds, itemCount=fieldCount, rc=rc)
@@ -447,7 +445,7 @@ contains
       call ESMF_StateGet(STflds, itemNameList=lfieldNameList, rc=rc)
       if (chkerr(rc,__LINE__,u_FILE_u)) return
       if (dbug_flag > 5) then
-         call ESMF_LogWrite(trim(subname)//":"//trim(lname)//" fieldNameList from STflds", ESMF_LOGMSG_INFO, rc=rc)
+         call ESMF_LogWrite(trim(subname)//":"//trim(lname)//" fieldNameList from STflds", ESMF_LOGMSG_INFO)
       end if
     elseif (present(FBgeom)) then
       call ESMF_FieldBundleGet(FBgeom, fieldCount=fieldCount, rc=rc)
@@ -456,7 +454,7 @@ contains
       call ESMF_FieldBundleGet(FBgeom, fieldNameList=lfieldNameList, rc=rc)
       if (chkerr(rc,__LINE__,u_FILE_u)) return
       if (dbug_flag > 5) then
-         call ESMF_LogWrite(trim(subname)//":"//trim(lname)//" fieldNameList from FBgeom", ESMF_LOGMSG_INFO, rc=rc)
+         call ESMF_LogWrite(trim(subname)//":"//trim(lname)//" fieldNameList from FBgeom", ESMF_LOGMSG_INFO)
       end if
     elseif (present(STgeom)) then
       call ESMF_StateGet(STgeom, itemCount=fieldCount, rc=rc)
@@ -465,7 +463,7 @@ contains
       call ESMF_StateGet(STgeom, itemNameList=lfieldNameList, rc=rc)
       if (chkerr(rc,__LINE__,u_FILE_u)) return
       if (dbug_flag > 5) then
-         call ESMF_LogWrite(trim(subname)//":"//trim(lname)//" fieldNameList from STflds", ESMF_LOGMSG_INFO, rc=rc)
+         call ESMF_LogWrite(trim(subname)//":"//trim(lname)//" fieldNameList from STflds", ESMF_LOGMSG_INFO)
       end if
     else
        call ESMF_LogWrite(trim(subname)//": ERROR fieldNameList, FBflds, STflds, FBgeom, or STgeom must be passed", &
@@ -545,7 +543,7 @@ contains
        do n = 1, fieldCount
 
           ! Note that input fields come from ONE of FBFlds, STflds, or fieldNamelist input argument
-          if (present(FBFlds) .or. present(STflds)) then 
+          if (present(FBFlds) .or. present(STflds)) then
 
              ! ungridded dimensions might be present in the input states or field bundles
              if (present(FBflds)) then
@@ -597,22 +595,22 @@ contains
                 if (chkerr(rc,__LINE__,u_FILE_u)) return
              end if
 
-          else if (present(fieldNameList)) then 
-             
+          else if (present(fieldNameList)) then
+
              ! Assume no ungridded dimensions if just the field name list is give
              call ESMF_LogWrite(trim(subname)// ": creating new field "// &
                   trim(lfieldnamelist(n)) //" without ungridded dimension", ESMF_LOGMSG_INFO)
              field = ESMF_FieldCreate(lmesh, ESMF_TYPEKIND_R8, meshloc=meshloc, name=lfieldNameList(n), rc=rc)
              if (chkerr(rc,__LINE__,u_FILE_u)) return
-             
+
           end if
-             
+
           ! Add the created field bundle FBout
           call ESMF_LogWrite(trim(subname)//":"//trim(lname)//" adding field "//trim(lfieldNameList(n)), &
                ESMF_LOGMSG_INFO)
           call ESMF_FieldBundleAdd(FBout, (/field/), rc=rc)
           if (chkerr(rc,__LINE__,u_FILE_u)) return
-          
+
        enddo  ! fieldCount
     endif  ! fieldcountgeom
 
@@ -1691,7 +1689,7 @@ contains
 
     call ESMF_FieldBundleGet(FB, fieldName=trim(fldname), isPresent=isPresent, rc=rc)
     if (chkerr(rc,__LINE__,u_FILE_u)) then
-       call ESMF_LogWrite(trim(subname)//" Error checking field: "//trim(fldname), & 
+       call ESMF_LogWrite(trim(subname)//" Error checking field: "//trim(fldname), &
             ESMF_LOGMSG_ERROR)
        return
     endif
@@ -1759,11 +1757,11 @@ contains
     if (status /= ESMF_FIELDSTATUS_COMPLETE) then
       lrank = 0
       if (labort) then
-        call ESMF_LogWrite(trim(subname)//": ERROR data not allocated ", ESMF_LOGMSG_INFO, rc=rc)
+        call ESMF_LogWrite(trim(subname)//": ERROR data not allocated ", ESMF_LOGMSG_INFO)
         rc = ESMF_FAILURE
         return
       else
-        call ESMF_LogWrite(trim(subname)//": WARNING data not allocated ", ESMF_LOGMSG_INFO, rc=rc)
+        call ESMF_LogWrite(trim(subname)//": WARNING data not allocated ", ESMF_LOGMSG_INFO)
       endif
     else
 
@@ -1783,9 +1781,9 @@ contains
         if (chkerr(rc,__LINE__,u_FILE_u)) return
         if (nnodes == 0 .and. nelements == 0) lrank = 0
 
-      else  
+      else
          call ESMF_LogWrite(trim(subname)//": ERROR geomtype not supported ", &
-              ESMF_LOGMSG_INFO, rc=rc)
+              ESMF_LOGMSG_INFO)
         rc = ESMF_FAILURE
         return
       endif ! geomtype
@@ -2249,15 +2247,12 @@ contains
       ! no local data
     elseif (lrank == 1) then
       write (msgString,*) trim(subname)//":"//trim(string)//": dataptr bounds dim=1 ",lbound(dataptr1,1),ubound(dataptr1,1)
-      call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO, rc=rc)
-      if (chkerr(rc,__LINE__,u_FILE_u)) return
+      call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO)
     elseif (lrank == 2) then
       write (msgString,*) trim(subname)//":"//trim(string)//": dataptr bounds dim=1 ",lbound(dataptr2,1),ubound(dataptr2,1)
-      call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO, rc=rc)
-      if (chkerr(rc,__LINE__,u_FILE_u)) return
+      call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO)
       write (msgString,*) trim(subname)//":"//trim(string)//": dataptr bounds dim=2 ",lbound(dataptr2,2),ubound(dataptr2,2)
-      call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO, rc=rc)
-      if (chkerr(rc,__LINE__,u_FILE_u)) return
+      call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO)
     elseif (lrank == 0) then
       ! means data allocation does not exist yet
       continue
@@ -2316,31 +2311,26 @@ contains
        if (chkerr(rc,__LINE__,u_FILE_u)) return
 
        write (msgString,*) trim(subname)//":"//trim(string)//": distGrid=element"
-       call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO, rc=rc)
-       if (chkerr(rc,__LINE__,u_FILE_u)) return
+       call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO)
 
        call ESMF_DistGridGet(distgrid, deLayout=deLayout, dimCount=dimCount, &
             tileCount=tileCount, deCount=deCount, rc=rc)
        if (chkerr(rc,__LINE__,u_FILE_u)) return
 
        write (msgString,*) trim(subname)//":"//trim(string)//":    dimCount=", dimCount
-       call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO, rc=rc)
-       if (chkerr(rc,__LINE__,u_FILE_u)) return
+       call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO)
 
        write (msgString,*) trim(subname)//":"//trim(string)//":    tileCount=", tileCount
-       call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO, rc=rc)
-       if (chkerr(rc,__LINE__,u_FILE_u)) return
+       call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO)
 
        write (msgString,*) trim(subname)//":"//trim(string)//":    deCount=", deCount
-       call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO, rc=rc)
-       if (chkerr(rc,__LINE__,u_FILE_u)) return
+       call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO)
 
        call ESMF_DELayoutGet(deLayout, localDeCount=localDeCount, rc=rc)
        if (chkerr(rc,__LINE__,u_FILE_u)) return
 
        write (msgString,*) trim(subname)//":"//trim(string)//":    localDeCount=", localDeCount
-       call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO, rc=rc)
-       if (chkerr(rc,__LINE__,u_FILE_u)) return
+       call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO)
 
        ! allocate minIndexPTile and maxIndexPTile accord. to dimCount and tileCount
        allocate(minIndexPTile(dimCount, tileCount), &
@@ -2352,12 +2342,10 @@ contains
        if (chkerr(rc,__LINE__,u_FILE_u)) return
 
        write (msgString,*) trim(subname)//":"//trim(string)//":    minIndexPTile=", minIndexPTile
-       call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO, rc=rc)
-       if (chkerr(rc,__LINE__,u_FILE_u)) return
+       call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO)
 
        write (msgString,*) trim(subname)//":"//trim(string)//":    maxIndexPTile=", maxIndexPTile
-       call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO, rc=rc)
-       if (chkerr(rc,__LINE__,u_FILE_u)) return
+       call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO)
 
        deallocate(minIndexPTile, maxIndexPTile)
 
@@ -2368,31 +2356,26 @@ contains
        if (chkerr(rc,__LINE__,u_FILE_u)) return
 
        write (msgString,*) trim(subname)//":"//trim(string)//": distGrid=nodal"
-       call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO, rc=rc)
-       if (chkerr(rc,__LINE__,u_FILE_u)) return
+       call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO)
 
        call ESMF_DistGridGet(distgrid, deLayout=deLayout, dimCount=dimCount, &
             tileCount=tileCount, deCount=deCount, rc=rc)
        if (chkerr(rc,__LINE__,u_FILE_u)) return
 
        write (msgString,*) trim(subname)//":"//trim(string)//":    dimCount=", dimCount
-       call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO, rc=rc)
-       if (chkerr(rc,__LINE__,u_FILE_u)) return
+       call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO)
 
        write (msgString,*) trim(subname)//":"//trim(string)//":    tileCount=", tileCount
-       call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO, rc=rc)
-       if (chkerr(rc,__LINE__,u_FILE_u)) return
+       call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO)
 
        write (msgString,*) trim(subname)//":"//trim(string)//":    deCount=", deCount
-       call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO, rc=rc)
-       if (chkerr(rc,__LINE__,u_FILE_u)) return
+       call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO)
 
        call ESMF_DELayoutGet(deLayout, localDeCount=localDeCount, rc=rc)
        if (chkerr(rc,__LINE__,u_FILE_u)) return
 
        write (msgString,*) trim(subname)//":"//trim(string)//":    localDeCount=", localDeCount
-       call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO, rc=rc)
-       if (chkerr(rc,__LINE__,u_FILE_u)) return
+       call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO)
 
        ! allocate minIndexPTile and maxIndexPTile accord. to dimCount and tileCount
        allocate(minIndexPTile(dimCount, tileCount), &
@@ -2404,12 +2387,10 @@ contains
        if (chkerr(rc,__LINE__,u_FILE_u)) return
 
        write (msgString,*) trim(subname)//":"//trim(string)//":    minIndexPTile=", minIndexPTile
-       call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO, rc=rc)
-       if (chkerr(rc,__LINE__,u_FILE_u)) return
+       call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO)
 
        write (msgString,*) trim(subname)//":"//trim(string)//":    maxIndexPTile=", maxIndexPTile
-       call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO, rc=rc)
-       if (chkerr(rc,__LINE__,u_FILE_u)) return
+       call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO)
 
        deallocate(minIndexPTile, maxIndexPTile)
 
@@ -2429,13 +2410,13 @@ contains
        if (chkerr(rc,__LINE__,u_FILE_u)) return
 
        write (msgString,*) trim(subname)//":"//trim(string)//": parametricDim=", pdim
-       call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO, rc=rc)
+       call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO)
        write (msgString,*) trim(subname)//":"//trim(string)//": spatialDim=", sdim
-       call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO, rc=rc)
+       call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO)
        write (msgString,*) trim(subname)//":"//trim(string)//": numOwnedNodes=", nnodes
-       call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO, rc=rc)
+       call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO)
        write (msgString,*) trim(subname)//":"//trim(string)//": numOwnedElements=", nelements
-       call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO, rc=rc)
+       call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO)
        if (chkerr(rc,__LINE__,u_FILE_u)) return
     endif
 
@@ -2481,24 +2462,20 @@ contains
     if (chkerr(rc,__LINE__,u_FILE_u)) return
 
     write (msgString,*) trim(subname)//":"//trim(string)//": localDeCount=", localDeCount
-    call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO, rc=rc)
-    if (chkerr(rc,__LINE__,u_FILE_u)) return
+    call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO)
 
     ! get dimCount and tileCount
     call ESMF_DistGridGet(distgrid, dimCount=dimCount, tileCount=tileCount, deCount=deCount, rc=rc)
     if (chkerr(rc,__LINE__,u_FILE_u)) return
 
     write (msgString,*) trim(subname)//":"//trim(string)//": dimCount=", dimCount
-    call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO, rc=rc)
-    if (chkerr(rc,__LINE__,u_FILE_u)) return
+    call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO)
 
     write (msgString,*) trim(subname)//":"//trim(string)//": tileCount=", tileCount
-    call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO, rc=rc)
-    if (chkerr(rc,__LINE__,u_FILE_u)) return
+    call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO)
 
     write (msgString,*) trim(subname)//":"//trim(string)//": deCount=", deCount
-    call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO, rc=rc)
-    if (chkerr(rc,__LINE__,u_FILE_u)) return
+    call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO)
 
     ! allocate minIndexPTile and maxIndexPTile accord. to dimCount and tileCount
     allocate(minIndexPTile(dimCount, tileCount), &
@@ -2510,12 +2487,10 @@ contains
     if (chkerr(rc,__LINE__,u_FILE_u)) return
 
     write (msgString,*) trim(subname)//":"//trim(string)//": minIndexPTile=", minIndexPTile
-    call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO, rc=rc)
-    if (chkerr(rc,__LINE__,u_FILE_u)) return
+    call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO)
 
     write (msgString,*) trim(subname)//":"//trim(string)//": maxIndexPTile=", maxIndexPTile
-    call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO, rc=rc)
-    if (chkerr(rc,__LINE__,u_FILE_u)) return
+    call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO)
 
     deallocate(minIndexPTile, maxIndexPTile)
 
@@ -2524,14 +2499,14 @@ contains
 !    if (chkerr(rc,__LINE__,u_FILE_u)) return
 
 !    write (msgString,*) trim(subname)//":"//trim(string)//": staggerlocCount=", staggerlocCount
-!    call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO, rc=rc)
+!    call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO)
 !    if (chkerr(rc,__LINE__,u_FILE_u)) return
 
 !    call ESMF_GridGet(grid, arbDimCount=arbDimCount, rc=rc)
 !    if (chkerr(rc,__LINE__,u_FILE_u)) return
 
 !    write (msgString,*) trim(subname)//":"//trim(string)//": arbDimCount=", arbDimCount
-!    call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO, rc=rc)
+!    call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO)
 !    if (chkerr(rc,__LINE__,u_FILE_u)) return
 
     ! get rank
@@ -2539,8 +2514,7 @@ contains
     if (chkerr(rc,__LINE__,u_FILE_u)) return
 
     write (msgString,*) trim(subname)//":"//trim(string)//": rank=", rank
-    call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO, rc=rc)
-    if (chkerr(rc,__LINE__,u_FILE_u)) return
+    call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO)
 
     do n1 = 1,2
       if (n1 == 1) then
@@ -2551,14 +2525,12 @@ contains
         staggerstr = 'ESMF_STAGGERLOC_CORNER'
       else
         rc = ESMF_FAILURE
-        call ESMF_LogWrite(trim(subname)//":staggerloc failure", ESMF_LOGMSG_INFO, rc=rc)
-        if (chkerr(rc,__LINE__,u_FILE_u)) return
+        call ESMF_LogWrite(trim(subname)//":staggerloc failure", ESMF_LOGMSG_INFO)
       endif
       call ESMF_GridGetCoord(grid, staggerloc=staggerloc, isPresent=isPresent, rc=rc)
       if (chkerr(rc,__LINE__,u_FILE_u)) return
       write (msgString,*) trim(subname)//":"//trim(staggerstr)//" present=",isPresent
-      call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO, rc=rc)
-      if (chkerr(rc,__LINE__,u_FILE_u)) return
+      call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO)
       if (isPresent) then
         do n3 = 0,localDECount-1
         do n2 = 1,dimCount
@@ -2572,8 +2544,7 @@ contains
             if (chkerr(rc,__LINE__,u_FILE_u)) return
             write (msgString,'(a,2i4,2f16.8)') trim(subname)//":"//trim(staggerstr)//" coord=",n2,n3,minval(fldptr2),maxval(fldptr2)
           endif
-          call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO, rc=rc)
-          if (chkerr(rc,__LINE__,u_FILE_u)) return
+          call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO)
         enddo
         enddo
       endif
@@ -3168,7 +3139,7 @@ contains
     else
       scalar_value = 0.0_R8
       call ESMF_LogWrite(trim(subname)//": no ESMF_Field found named: "//trim(flds_scalar_name), ESMF_LOGMSG_INFO)
-    end if 
+    end if
 
   end subroutine med_methods_State_GetScalar
 
@@ -3384,7 +3355,7 @@ contains
 
   subroutine med_methods_FB_getNumFlds(FB, string, nflds, rc)
 
-    ! ---------------------------------------------- 
+    ! ----------------------------------------------
     ! Determine if fieldbundle is created and if so, the number of non-scalar
     ! fields in the field bundle
     ! ----------------------------------------------
@@ -3402,7 +3373,7 @@ contains
 
     if (.not. ESMF_FieldBundleIsCreated(FB)) then
        call ESMF_LogWrite(trim(string)//": has not been created, returning", ESMF_LOGMSG_INFO)
-       nflds = 0 
+       nflds = 0
     else
        ! Note - the scalar field has been removed from all mediator
        ! field bundles - so this is why we check if the fieldCount is 0 and not 1 here
@@ -3420,7 +3391,7 @@ contains
 
   subroutine med_methods_States_GetSharedFlds(State1, State2, flds_scalar_name, fldnames_shared, rc)
 
-    ! ---------------------------------------------- 
+    ! ----------------------------------------------
     ! Get shared Fld names between State1 and State2 and
     ! allocate the return array fldnames_shared
     ! ----------------------------------------------
@@ -3445,7 +3416,7 @@ contains
     rc = ESMF_SUCCESS
 
     if (associated(fldnames_shared)) then
-       call ESMF_LogWrite(trim(subname)//": ERROR fldnames_shared must not be associated ", ESMF_LOGMSG_INFO, rc=rc)
+       call ESMF_LogWrite(trim(subname)//": ERROR fldnames_shared must not be associated ", ESMF_LOGMSG_INFO)
        rc = ESMF_FAILURE
        RETURN
     end if
@@ -3486,4 +3457,3 @@ contains
   end subroutine med_methods_States_GetSharedFlds
 
 end module med_methods_mod
-

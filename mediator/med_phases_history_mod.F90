@@ -803,8 +803,7 @@ contains
                         nx=nx, ny=ny, nt=1, whead=whead, wdata=wdata, pre='Med_aoflux_atm', rc=rc)
                 end if
              end if
-          end if
-
+          enddo
        end do ! end of loop over m
 
        ! Close file
