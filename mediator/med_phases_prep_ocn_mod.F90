@@ -100,13 +100,13 @@ contains
     end if
 
     ! ocean accumulator
-    call FB_accum(is_local%wrap%FBExpAccum(compocn), is_local%wrap%FBExp(compocn), rc=rc)
+    call FB_accum(is_local%wrap%FBExpAccumOcn, is_local%wrap%FBExp(compocn), rc=rc)
     if (ChkErr(rc,__LINE__,u_FILE_u)) return
-    is_local%wrap%FBExpAccumCnt(compocn) = is_local%wrap%FBExpAccumCnt(compocn) + 1
+    is_local%wrap%ExpAccumOcnCnt = is_local%wrap%ExpAccumOcnCnt + 1
 
     ! diagnose output
     if (dbug_flag > 1) then
-       call FB_diagnose(is_local%wrap%FBExpAccum(compocn), string=trim(subname)//' FBExpAccum accumulation ', rc=rc)
+       call FB_diagnose(is_local%wrap%FBExpAccumOcn, string=trim(subname)//' FBExpAccumOcn accumulation ', rc=rc)
        if (ChkErr(rc,__LINE__,u_FILE_u)) return
     end if
     if (dbug_flag > 20) then
@@ -147,34 +147,32 @@ contains
     if (ChkErr(rc,__LINE__,u_FILE_u)) return
 
     ! Count the number of fields outside of scalar data, if zero, then return
-    call ESMF_FieldBundleGet(is_local%wrap%FBExpAccum(compocn), fieldCount=ncnt, rc=rc)
+    call ESMF_FieldBundleGet(is_local%wrap%FBExpAccumOcn, fieldCount=ncnt, rc=rc)
     if (chkerr(rc,__LINE__,u_FILE_u)) return
 
     if (ncnt > 0) then
 
        ! average ocn accumulator
        if (dbug_flag > 1) then
-          call FB_diagnose(is_local%wrap%FBExpAccum(compocn), &
-               string=trim(subname)//' FBExpAccum(compocn) before avg ', rc=rc)
+          call FB_diagnose(is_local%wrap%FBExpAccumOcn, &
+               string=trim(subname)//' FBExpAccumOcn before avg ', rc=rc)
           if (ChkErr(rc,__LINE__,u_FILE_u)) return
        end if
-       call FB_average(is_local%wrap%FBExpAccum(compocn), &
-            is_local%wrap%FBExpAccumCnt(compocn), rc=rc)
+       call FB_average(is_local%wrap%FBExpAccumOcn, is_local%wrap%ExpAccumOcnCnt, rc=rc)
        if (ChkErr(rc,__LINE__,u_FILE_u)) return
        if (dbug_flag > 1) then
-          call FB_diagnose(is_local%wrap%FBExpAccum(compocn), &
-               string=trim(subname)//' FBExpAccum(compocn) after avg ', rc=rc)
+          call FB_diagnose(is_local%wrap%FBExpAccumOcn, &
+               string=trim(subname)//' FBExpAccumOcn after avg ', rc=rc)
           if (ChkErr(rc,__LINE__,u_FILE_u)) return
        end if
 
        ! copy to FBExp(compocn)
-       call FB_copy(is_local%wrap%FBExp(compocn), is_local%wrap%FBExpAccum(compocn), rc=rc)
+       call FB_copy(is_local%wrap%FBExp(compocn), is_local%wrap%FBExpAccumOcn, rc=rc)
        if (ChkErr(rc,__LINE__,u_FILE_u)) return
 
        ! zero accumulator
-       is_local%wrap%FBExpAccumFlag(compocn) = .true.
-       is_local%wrap%FBExpAccumCnt(compocn) = 0
-       call FB_reset(is_local%wrap%FBExpAccum(compocn), value=czero, rc=rc)
+       is_local%wrap%ExpAccumOcnCnt = 0
+       call FB_reset(is_local%wrap%FBExpAccumOcn, value=czero, rc=rc)
        if (ChkErr(rc,__LINE__,u_FILE_u)) return
 
     end if

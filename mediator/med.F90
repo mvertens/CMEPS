@@ -1715,9 +1715,9 @@ contains
     !   Do not assume any import fields are connected, just allocate space and such
     !   -- Check present flags
     !   -- Check for active coupling interactions
-    !   -- Create FBs: FBImp, FBExp, FBExpAccum
+    !   -- Create FBs: FBImp, FBExp, FBExpAccumOcn
     !   -- Create mediator specific field bundles (not part of import/export states)
-    !   -- Initialize FBExpAccums (to zero), and FBImp (from NStateImp)
+    !   -- Initialize FBExpAccumOcn (to zero), and FBImp (from NStateImp)
     !   -- Read mediator restarts
     !   -- Initialize route handles field bundles for normalization
     !   -- return!
@@ -2007,14 +2007,6 @@ contains
                  is_local%wrap%flds_scalar_name, name='FBExp'//trim(compname(n1)), rc=rc)
             if (ChkErr(rc,__LINE__,u_FILE_u)) return
 
-            ! Create export accumulation field bundles
-            call FB_init(is_local%wrap%FBExpAccum(n1), is_local%wrap%flds_scalar_name, &
-                 STgeom=is_local%wrap%NStateExp(n1), STflds=is_local%wrap%NStateExp(n1), &
-                 name='FBExpAccum'//trim(compname(n1)), rc=rc)
-            if (ChkErr(rc,__LINE__,u_FILE_u)) return
-            call FB_reset(is_local%wrap%FBExpAccum(n1), value=czero, rc=rc)
-            if (ChkErr(rc,__LINE__,u_FILE_u)) return
-
             ! Create mesh info data
             call ESMF_FieldBundleGet(is_local%wrap%FBImp(n1,n1), fieldCount=fieldCount, rc=rc)
             if (ChkErr(rc,__LINE__,u_FILE_u)) return
@@ -2071,6 +2063,22 @@ contains
 
       enddo ! loop over n1
 
+      ! Create ocn export accumulation field bundle
+      if (is_local%wrap%comp_present(compocn) .and. &
+           ESMF_StateIsCreated(is_local%wrap%NStateImp(compocn),rc=rc) .and. &
+           ESMF_StateIsCreated(is_local%wrap%NStateExp(compocn),rc=rc)) then
+
+         if (mastertask) then
+            write(logunit,'(a)') trim(subname)//' initializing ocean export accumulation FB for '
+         end if
+         call FB_init(is_local%wrap%FBExpAccumOcn, is_local%wrap%flds_scalar_name, &
+              STgeom=is_local%wrap%NStateExp(compocn), STflds=is_local%wrap%NStateExp(compocn), &
+              name='FBExpAccumOcn', rc=rc)
+         if (ChkErr(rc,__LINE__,u_FILE_u)) return
+         call FB_reset(is_local%wrap%FBExpAccumOcn, value=czero, rc=rc)
+         if (ChkErr(rc,__LINE__,u_FILE_u)) return
+      end if
+
       !---------------------------------------
       ! Initialize field bundles needed for ocn albedo calculation
       !---------------------------------------
@@ -2114,25 +2122,23 @@ contains
       ! NOTE: this section must be done BEFORE the second call to esmFldsExchange
       ! Create field bundles for mediator ocean albedo computation
 
+      is_local%wrap%do_med_aoflux = .false.
       fieldCount = med_fldList_GetNumFlds(fldListMed_aoflux)
-      if ( fieldCount > 0 .and. &
-           is_local%wrap%med_coupling_active(compocn,compatm) .or. &
-           is_local%wrap%med_coupling_active(compatm,compocn)) then
-         is_local%wrap%do_med_aoflux = .true.
-      else
-         is_local%wrap%do_med_aoflux = .false.
-      end if
-      if (is_local%wrap%do_med_aoflux) then
-         if ( is_local%wrap%aoflux_grid == 'ogrid' .and. .not. &
-            is_local%wrap%med_coupling_active(compatm,compocn)) then
-            is_local%wrap%med_coupling_active(compatm,compocn) = .true.
+      if ( fieldCount > 0 ) then
+         if ( is_local%wrap%med_coupling_active(compocn,compatm) .or. &
+              is_local%wrap%med_coupling_active(compatm,compocn)) then
+            if ( is_local%wrap%aoflux_grid == 'ogrid' .and. .not. &
+                 is_local%wrap%med_coupling_active(compatm,compocn)) then
+               is_local%wrap%med_coupling_active(compatm,compocn) = .true.
+            end if
+            if ( is_local%wrap%aoflux_grid == 'agrid' .and. .not. &
+                 is_local%wrap%med_coupling_active(compocn,compatm)) then
+               is_local%wrap%med_coupling_active(compocn,compatm) = .true.
+            end if
+            call med_phases_aofluxes_init_fldbuns(gcomp, rc=rc)
+            if (ChkErr(rc,__LINE__,u_FILE_u)) return
+            is_local%wrap%do_med_aoflux = .true.
          end if
-         if ( is_local%wrap%aoflux_grid == 'agrid' .and. .not. &
-            is_local%wrap%med_coupling_active(compocn,compatm)) then
-            is_local%wrap%med_coupling_active(compocn,compatm) = .true.
-         end if
-         call med_phases_aofluxes_init_fldbuns(gcomp, rc=rc)
-         if (ChkErr(rc,__LINE__,u_FILE_u)) return
       end if
 
       !---------------------------------------
