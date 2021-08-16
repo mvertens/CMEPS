@@ -27,8 +27,9 @@ module med_phases_prep_ocn_mod
   implicit none
   private
 
-  public :: med_phases_prep_ocn_accum
-  public :: med_phases_prep_ocn_avg
+  public :: med_phases_prep_ocn_init   ! called from med.F90
+  public :: med_phases_prep_ocn_accum  ! called from run sequence
+  public :: med_phases_prep_ocn_avg    ! called from run sequence
 
   private :: med_phases_prep_ocn_custom_cesm
   private :: med_phases_prep_ocn_custom_nems
@@ -40,6 +41,41 @@ module med_phases_prep_ocn_mod
 contains
 !-----------------------------------------------------------------------------
 
+  subroutine med_phases_prep_ocn_init(gcomp, rc)
+
+    use ESMF            , only : ESMF_GridComp, ESMF_SUCCESS
+    use med_methods_mod , only : FB_Init  => med_methods_FB_init
+    use med_methods_mod , only : FB_Reset => med_methods_FB_Reset
+
+    ! input/output variables
+    type(ESMF_GridComp)  :: gcomp
+    integer, intent(out) :: rc
+
+    ! local variables
+    type(InternalState) :: is_local
+    character(len=*),parameter  :: subname=' (med_phases_prep_ocn_init) '
+    !---------------------------------------
+
+    rc = ESMF_SUCCESS
+
+    ! Get the internal state
+    nullify(is_local%wrap)
+    call ESMF_GridCompGetInternalState(gcomp, is_local, rc)
+    if (chkErr(rc,__LINE__,u_FILE_u)) return
+
+    if (mastertask) then
+       write(logunit,'(a)') trim(subname)//' initializing ocean export accumulation FB for '
+    end if
+    call FB_init(is_local%wrap%FBExpAccumOcn, is_local%wrap%flds_scalar_name, &
+         STgeom=is_local%wrap%NStateExp(compocn), STflds=is_local%wrap%NStateExp(compocn), &
+         name='FBExpAccumOcn', rc=rc)
+    if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    call FB_reset(is_local%wrap%FBExpAccumOcn, value=czero, rc=rc)
+    if (ChkErr(rc,__LINE__,u_FILE_u)) return
+
+  end subroutine med_phases_prep_ocn_init
+
+  !-----------------------------------------------------------------------------
   subroutine med_phases_prep_ocn_accum(gcomp, rc)
 
     use ESMF , only : ESMF_GridComp, ESMF_FieldBundleGet

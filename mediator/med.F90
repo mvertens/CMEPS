@@ -1743,6 +1743,7 @@ contains
     use med_fraction_mod        , only : med_fraction_init, med_fraction_set
     use med_phases_restart_mod  , only : med_phases_restart_read
     use med_phases_prep_glc_mod , only : med_phases_prep_glc_init
+    use med_phases_prep_ocn_mod , only : med_phases_prep_ocn_init
     use med_phases_prep_rof_mod , only : med_phases_prep_rof_init
     use med_phases_prep_atm_mod , only : med_phases_prep_atm
     use med_phases_post_atm_mod , only : med_phases_post_atm
@@ -1981,7 +1982,7 @@ contains
       endif
 
       !----------------------------------------------------------
-      ! Create field bundles FBImp, FBExp, FBExpAccum
+      ! Create field bundles FBImp, FBExp
       !----------------------------------------------------------
 
       if (mastertask) then
@@ -2031,7 +2032,7 @@ contains
          ! The following are FBImp mapped to different grids.
          ! FBImp(n1,n1) is handled above
          do n2 = 1,ncomps
-            if (n1 /= n2 .and. &
+            if ( n1 /= n2 .and. &
                  is_local%wrap%med_coupling_active(n1,n2) .and. &
                  ESMF_StateIsCreated(is_local%wrap%NStateImp(n1),rc=rc) .and. &
                  ESMF_StateIsCreated(is_local%wrap%NStateImp(n2),rc=rc)) then
@@ -2062,22 +2063,6 @@ contains
          enddo ! loop over n2
 
       enddo ! loop over n1
-
-      ! Create ocn export accumulation field bundle
-      if (is_local%wrap%comp_present(compocn) .and. &
-           ESMF_StateIsCreated(is_local%wrap%NStateImp(compocn),rc=rc) .and. &
-           ESMF_StateIsCreated(is_local%wrap%NStateExp(compocn),rc=rc)) then
-
-         if (mastertask) then
-            write(logunit,'(a)') trim(subname)//' initializing ocean export accumulation FB for '
-         end if
-         call FB_init(is_local%wrap%FBExpAccumOcn, is_local%wrap%flds_scalar_name, &
-              STgeom=is_local%wrap%NStateExp(compocn), STflds=is_local%wrap%NStateExp(compocn), &
-              name='FBExpAccumOcn', rc=rc)
-         if (ChkErr(rc,__LINE__,u_FILE_u)) return
-         call FB_reset(is_local%wrap%FBExpAccumOcn, value=czero, rc=rc)
-         if (ChkErr(rc,__LINE__,u_FILE_u)) return
-      end if
 
       !---------------------------------------
       ! Initialize field bundles needed for ocn albedo calculation
@@ -2197,6 +2182,16 @@ contains
        end if
 
       !---------------------------------------
+      ! Initialize ocn export accumulation field bundle
+      !---------------------------------------
+      if ( is_local%wrap%comp_present(compocn) .and. &
+           ESMF_StateIsCreated(is_local%wrap%NStateImp(compocn),rc=rc) .and. &
+           ESMF_StateIsCreated(is_local%wrap%NStateExp(compocn),rc=rc)) then
+         call med_phases_prep_ocn_init(gcomp, rc)
+         if (ChkErr(rc,__LINE__,u_FILE_u)) return
+      end if
+
+      !---------------------------------------
       ! Initialize glc module field bundles here if appropriate
       !---------------------------------------
       do ns = 1,num_icesheets
@@ -2210,6 +2205,9 @@ contains
          if (ChkErr(rc,__LINE__,u_FILE_u)) return
       end if
 
+      !---------------------------------------
+      ! Initialize rof module field bundles here if appropriate
+      !---------------------------------------
       if (is_local%wrap%med_coupling_active(comprof,complnd)) then
          call med_phases_prep_rof_init(gcomp, rc=rc)
          if (ChkErr(rc,__LINE__,u_FILE_u)) return

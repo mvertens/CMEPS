@@ -29,8 +29,8 @@ module med_phases_prep_rof_mod
   private
 
   public  :: med_phases_prep_rof_init   ! called from med.F90
-  public  :: med_phases_prep_rof        ! called by run sequence
   public  :: med_phases_prep_rof_accum  ! called by med_phases_post_lnd.F90
+  public  :: med_phases_prep_rof        ! called by run sequence
 
   private :: med_phases_prep_rof_irrig
 
@@ -54,6 +54,8 @@ module med_phases_prep_rof_mod
   integer :: maptype_lnd2rof
   integer :: maptype_rof2lnd
 
+  ! Accumulation to river field bundles - accumulation is done on the land mesh and then averaged and mapped to the
+  ! rof mesh
   integer               , public :: lndAccum2rof_cnt
   type(ESMF_FieldBundle), public :: FBlndAccum2rof_l
   type(ESMF_FieldBundle), public :: FBlndAccum2rof_r
@@ -333,21 +335,8 @@ contains
     ! Map to create FBlndAccum2rof_r
     !---------------------------------------
 
-    ! ! The following assumes that only land import fields are needed to create the
-    ! ! export fields for the river component and that ALL mappings are done with mapconsf
-
-    ! do nf = 1,size(lnd2rof_flds)
-    !    call ESMF_FieldBundleGet(FBlndAccum2rof_l, fieldName=trim(lnd2rof_flds(n)), field=lfield_src, rc=rc)
-    !    if (chkerr(rc,__LINE__,u_FILE_u)) return
-    !    call ESMF_FieldBundleGet(FBlndAccum2rof_r, fieldName=trim(lnd2rof_flds(n)), field=lfield_dst, rc=rc)
-    !    if (chkerr(rc,__LINE__,u_FILE_u)) return
-    !    call ESMF_FieldBundleGet(is_local%wrap%FBFrac(complnd), 'lfrac', field=field_lfrac_lnd, rc=rc)
-    !    if (chkerr(rc,__LINE__,u_FILE_u)) return
-    !    call med_map_field_normalized( field_src=lfield_src, field_dst=lfield_dst, &
-    !      routehandles=is_local%wrap%RH(complnd,comprof,:), maptype=mapconsf, &
-    !      field_normsrc=field_lfrac_lnd, field_normdst=field_lfrac_rof, rc=rc)
-    !    if (chkerr(rc,__LINE__,u_FILE_u)) return
-    ! end do
+    ! The following assumes that only land import fields are needed to create the
+    ! export fields for the river component and that ALL mappings are done with mapconsf
 
     call med_map_field_packed( FBSrc=FBlndAccum2rof_l, FBDst=FBlndAccum2rof_r, &
          FBFracSrc=is_local%wrap%FBFrac(complnd), &
