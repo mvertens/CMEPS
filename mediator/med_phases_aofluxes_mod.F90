@@ -1002,8 +1002,6 @@ contains
     real(r8)               :: sst_c
     real(r8)               :: scdms
     real(r8)               :: kwdms
-    real(r8), pointer      :: odms(:)
-    real(r8), pointer      :: sst(:)
     real(r8), pointer      :: u10m(:)
     real(r8), pointer      :: flux_dms(:)
     character(*),parameter :: subName = '(med_aofluxes_update) '
@@ -1126,6 +1124,21 @@ contains
        end if
     enddo
 
+    ! compute DMS fluxes to atm and ocn in in kg/m2/s
+    ! flux is downwards positive - therefore negative values to
+    ! the atmosphere (this is the opposite of what is there in BLOM)
+    if (compute_dms_flux) then
+       ! The following comes from the BLOM/iHAMOCC routine carchm.F90
+       ! See https://noresm-docs.readthedocs.io/en/noresm2/model-description/ocn_bgc_model.html
+       do n = 1,aoflux_in%lsize
+          sst_c = aoflux_in%tocn(n) - tfrz
+          sst_c = min(40.,max(-3., sst_c))
+          scdms = 2855.7+  (-177.63 + (6.0438 + (-0.11645 + 0.00094743*sst_c)*sst_c)*sst_c)*sst_c
+          kwdms = Xconvxa * aoflux_out%u10(n)**2 * (660./scdms)**0.5 
+          aoflux_out%dms(n) = -62.13 *kwdms * aoflux_in%dms_ocn(n)
+       end do
+    end if
+
     !----------------------------------
     ! map aoflux output to relevant atm/ocn grid(s)
     !----------------------------------
@@ -1180,51 +1193,6 @@ contains
        if (chkerr(rc,__LINE__,u_FILE_u)) return
     end if
 
-    ! compute DMS fluxes to atm and ocn
-    if (compute_dms_flux) then
-       if (is_local%wrap%aoflux_grid == 'ogrid') then
-          ! TODO: extend this to to agrid and xgrid
-
-          call ESMF_FieldBundleGet(is_local%wrap%FBImp(compocn,compocn), 'So_dms', field=field_src, rc=rc)
-          if (chkerr(rc,__LINE__,u_FILE_u)) return
-          call ESMF_FieldGet(field_src, farrayptr=odms, rc=rc)
-          if (chkerr(rc,__LINE__,u_FILE_u)) return
-
-          call ESMF_FieldBundleGet(is_local%wrap%FBImp(compocn,compocn), 'So_t', field=field_src, rc=rc)
-          if (chkerr(rc,__LINE__,u_FILE_u)) return
-          call ESMF_FieldGet(field_src, farrayptr=sst, rc=rc)
-          if (chkerr(rc,__LINE__,u_FILE_u)) return
-
-          call ESMF_FieldBundleGet(is_local%wrap%FBMed_aoflux_o, 'So_u10', field=field_src, rc=rc)
-          if (chkerr(rc,__LINE__,u_FILE_u)) return
-          call ESMF_FieldGet(field_src, farrayptr=u10m, rc=rc)
-          if (chkerr(rc,__LINE__,u_FILE_u)) return
-
-          call ESMF_FieldBundleGet(is_local%wrap%FBMed_aoflux_o, 'Faox_dms', field=field_src, rc=rc)
-          if (chkerr(rc,__LINE__,u_FILE_u)) return
-          call ESMF_FieldGet(field_src, farrayptr=flux_dms, rc=rc)
-          if (chkerr(rc,__LINE__,u_FILE_u)) return
-
-          ! flux_dms from ocean is in kg/m2/s
-          ! flux is downwards positive - therefore negative values to
-          ! the atmosphere (this is the opposite of what is there in BLOM)
-          ! The following comes from the BLOM/iHAMOCC routine carchm.F90
-          ! See https://noresm-docs.readthedocs.io/en/noresm2/model-description/ocn_bgc_model.html
-          do n = 1,size(sst)
-             sst_c = sst(n) - tfrz
-             sst_c = min(40.,max(-3., sst_c))
-             scdms = 2855.7+  (-177.63 + (6.0438 + (-0.11645 + 0.00094743*sst_c)*sst_c)*sst_c)*sst_c
-             kwdms = Xconvxa * u10m(n)**2 * (660./scdms)**0.5 
-             flux_dms(n) = -62.13 *kwdms * odms(n)
-          end do
-       else
-          call ESMF_LogWrite(trim(subname)//&
-               ": only ogrid has been enabled for dms flux computation", &
-               ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u)
-          rc = ESMF_FAILURE
-          return
-       end if
-    end if
 
     call t_stopf('MED:'//subname)
 
