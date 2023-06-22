@@ -22,6 +22,7 @@ module shr_flux_mod
   public :: flux_atmOcn_diurnal   ! computes atm/ocn fluxes with diurnal cycle
   public :: flux_atmOcn_UA        ! computes atm/ocn fluxes using University of Ariz algorithm (Zeng et al., 1998)
   public :: flux_atmOcn_dms       ! computes atm/ocn dms fluxes based on HAMOCC scheme
+  public :: flux_atmOcn_bromo     ! computes atm/ocn bromo fluxes based on HAMOCC scheme
   public :: flux_MOstability      ! boundary layer stability scales/functions
   public :: flux_adjust_constants ! adjust constant values used in flux calculations. (used by CAM as well)
 
@@ -2330,7 +2331,7 @@ contains
     real(r8) :: scdms
     real(r8) :: kwdms
     real(r8), parameter :: Xconvxa= 6.97e-07  ! Wanninkhof's a=0.251 converted to ms-1/(ms-1)^2 
-    character(*),parameter :: subName = '(shr_flux_dms)'
+    character(*),parameter :: subName = '(flux_atmOcn_dms)'
     !-----------------------------------------------------------------------
 
     ! The following comes from the BLOM/iHAMOCC routine carchm.F90
@@ -2342,7 +2343,46 @@ contains
        kwdms = Xconvxa * u10(n)**2 * (660./scdms)**0.5 
        flux_dms(n) = -62.13 *kwdms * ocn_dms(n)
     end do
-
   end subroutine flux_atmOcn_dms
+
+  !===============================================================================
+  subroutine flux_atmOcn_bromo(tocn, u10, psfc, ocn_bromo, flux_bromo)
+
+    ! Determine bromoform flux
+    ! Stemmler et al. (2015; Biogeosciences) Eq. (8) 
+    ! 1.e-2/3600 = conversion from [cm hr-1]/[m s-1]^2 to [ms-1]/[m s-1]^2
+
+    ! input/output variables 
+    real(r8), intent(in)  :: tocn(:)
+    real(r8), intent(in)  :: u10(:)
+    real(r8), intent(in)  :: psfc(:)
+    real(r8), intent(in)  :: ocn_bromo(:)
+    real(r8), intent(out) :: flux_bromo(:)
+
+    ! Local variables
+    integer  :: n
+    real(r8) :: sst_c
+    real(r8) :: sch_bromo
+    real(r8) :: kw_bromo
+    real(r8) :: a_bromo
+    real(r8) :: atm_bromo
+    character(*),parameter :: subName = '(flux_atmOcn_bromo) '
+    !-----------------------------------------------------------------------
+
+    ! Atm bromoform concentration
+    ! For now use 3.4ppt from Hense and Quack (2009; Biogeosciences) NEED TO
+    ! should be updated WITH Ziska et al. (2013) climatology database
+    atm_bromo = 3.4_r8
+
+    do n = 1,size(tocn)
+       sst_c = tocn(n) - loc_tkfrz
+       sst_c = min(40.,max(-3., sst_c))
+       sch_bromo = 4662.8 - 319.45*sst_c + 9.9012*sst_c**2 - 0.1159*sst_c**3
+       kw_bromo = 1.e-2/3600. * (0.222*u10(n)**2+0.33*u10(n))*(660./sch_bromo)**0.5
+       ! Henry's law constant [dimensionless] for Bromoform from Quack and Wallace (2003; GBC)
+       a_bromo = exp(13.16 - 4973*(1/tocn(n)))
+       flux_bromo(n) = kw_bromo * (atm_bromo/a_bromo*1e-12*psfc(n)*1e-5/(tocn(n)*0.083) - ocn_bromo(n))
+    end do
+  end subroutine flux_atmOcn_bromo
 
 end module shr_flux_mod
