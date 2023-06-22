@@ -353,7 +353,7 @@ contains
     use ESMF            , only : ESMF_Field, ESMF_FieldGet, ESMF_FieldBundle
     use med_methods_mod , only : FB_fldchk    => med_methods_FB_FldChk
 #ifdef CESMCOUPLED
-    use shr_flux_mod    , only : shr_flux_adjust_constants
+    use shr_flux_mod, only : flux_adjust_constants
 #else
     use flux_atmocn_mod , only : flux_adjust_constants
 #endif
@@ -430,9 +430,8 @@ contains
     end if
 
     ! Determine if dms flux will be computed in mediator
-    if (   FB_fldchk(is_local%wrap%FBImp(compocn,compocn), 'So_dms', rc=rc ) .and. &
-         ( FB_fldchk(is_local%wrap%FBExp(compocn), 'Faox_dms', rc=rc) .or. &
-           FB_fldchk(is_local%wrap%FBExp(compatm), 'Faxx_dms', rc=rc) ) ) then
+    if (FB_fldchk(is_local%wrap%FBImp(compocn,compocn), 'So_dms', rc=rc ) .and. &
+        FB_fldchk(is_local%wrap%FBExp(compocn), 'Faox_dms', rc=rc)) then
        compute_dms_flux = .true.
     else
        compute_dms_flux = .false.
@@ -479,17 +478,10 @@ contains
        flux_convergence = 0.0_r8
     end if
 
-#ifdef CESMCOUPLED
-    call shr_flux_adjust_constants(&
-         flux_convergence_tolerance=flux_convergence, &
-         flux_convergence_max_iteration=flux_max_iteration, &
-         coldair_outbreak_mod=coldair_outbreak_mod)
-#else
     call flux_adjust_constants(&
          flux_convergence_tolerance=flux_convergence, &
          flux_convergence_max_iteration=flux_max_iteration, &
          coldair_outbreak_mod=coldair_outbreak_mod)
-#endif
 
     if (dbug_flag > 5) then
       call ESMF_LogWrite(trim(subname)//": done", ESMF_LOGMSG_INFO)
@@ -976,7 +968,7 @@ contains
     use med_methods_mod, only : FB_fldchk => med_methods_FB_fldchk
     use med_methods_mod, only : FB_diagnose  => med_methods_FB_diagnose
 #ifdef CESMCOUPLED
-    use shr_flux_mod   , only : flux_atmocn
+    use shr_flux_mod   , only : flux_atmocn, flux_atmocn_dms
 #else
     use flux_atmocn_mod, only : flux_atmocn
 #endif
@@ -993,17 +985,11 @@ contains
     ! Local variables
     type(InternalState)    :: is_local
     integer                :: n                  ! indices
-    real(r8), parameter    :: qmin = 1.0e-8_r8   ! minimum
     real(r8), parameter    :: p0 = 100000.0_r8   ! reference pressure in Pa
-    real(r8), parameter    :: Xconvxa= 6.97e-07  ! Wanninkhof's a=0.251 converted to ms-1/(ms-1)^2 
+    real(r8), parameter    :: qmin = 1.0e-8_r8
     integer                :: maptype
     type(ESMF_Field)       :: field_src
     type(ESMF_Field)       :: field_dst
-    real(r8)               :: sst_c
-    real(r8)               :: scdms
-    real(r8)               :: kwdms
-    real(r8), pointer      :: u10m(:)
-    real(r8), pointer      :: flux_dms(:)
     character(*),parameter :: subName = '(med_aofluxes_update) '
     !-----------------------------------------------------------------------
 
@@ -1128,15 +1114,7 @@ contains
     ! flux is downwards positive - therefore negative values to
     ! the atmosphere (this is the opposite of what is there in BLOM)
     if (compute_dms_flux) then
-       ! The following comes from the BLOM/iHAMOCC routine carchm.F90
-       ! See https://noresm-docs.readthedocs.io/en/noresm2/model-description/ocn_bgc_model.html
-       do n = 1,aoflux_in%lsize
-          sst_c = aoflux_in%tocn(n) - tfrz
-          sst_c = min(40.,max(-3., sst_c))
-          scdms = 2855.7+  (-177.63 + (6.0438 + (-0.11645 + 0.00094743*sst_c)*sst_c)*sst_c)*sst_c
-          kwdms = Xconvxa * aoflux_out%u10(n)**2 * (660./scdms)**0.5 
-          aoflux_out%dms(n) = -62.13 *kwdms * aoflux_in%dms_ocn(n)
-       end do
+       call flux_atmocn_dms(aoflux_in%tocn, aoflux_out%u10, aoflux_in%dms_ocn, aoflux_out%dms)
     end if
 
     !----------------------------------

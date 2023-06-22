@@ -21,8 +21,9 @@ module shr_flux_mod
   public :: flux_atmOcn           ! computes atm/ocn fluxes
   public :: flux_atmOcn_diurnal   ! computes atm/ocn fluxes with diurnal cycle
   public :: flux_atmOcn_UA        ! computes atm/ocn fluxes using University of Ariz algorithm (Zeng et al., 1998)
+  public :: flux_atmOcn_dms       ! computes atm/ocn dms fluxes based on HAMOCC scheme
   public :: flux_MOstability      ! boundary layer stability scales/functions
-  public :: shr_flux_adjust_constants ! adjust constant values used in flux calculations. (used by CAM as well)
+  public :: flux_adjust_constants ! adjust constant values used in flux calculations. (used by CAM as well)
 
   ! !PRIVATE MEMBER FUNCTIONS:
   private :: psi_ua
@@ -77,13 +78,14 @@ module shr_flux_mod
 contains
 !===============================================================================
 
-  subroutine shr_flux_adjust_constants( &
+  subroutine flux_adjust_constants( &
        zvir, cpair, cpvir, karman, gravit, &
        latvap, latice, stebol, flux_convergence_tolerance, &
        flux_convergence_max_iteration, &
        coldair_outbreak_mod)
 
     ! Adjust local constants.  Used to support simple models.
+    ! This routine sets module variables based on input arguments
 
     real(R8), optional, intent(in) :: zvir
     real(R8), optional, intent(in) :: cpair
@@ -110,7 +112,7 @@ contains
     if (present(flux_convergence_max_iteration)) flux_con_max_iter = flux_convergence_max_iteration
     if (present(coldair_outbreak_mod)) use_coldair_outbreak_mod = coldair_outbreak_mod
 
-  end subroutine shr_flux_adjust_constants
+  end subroutine flux_adjust_constants
 
   !===============================================================================
   ! !IROUTINE: flux_atmOcn -- internal atm/ocn flux calculation
@@ -2310,5 +2312,37 @@ contains
        psit_30=(1.0_R8-f)*psik+f*psic
     endif
   end FUNCTION psit_30
+
+  !===============================================================================
+  subroutine flux_atmOcn_dms(tocn, u10, ocn_dms, flux_dms)
+
+    use shr_const_mod, only : tfrz => SHR_CONST_TKFRZ
+
+    ! input/output variables 
+    real(r8), intent(in)  :: tocn(:)
+    real(r8), intent(in)  :: u10(:)
+    real(r8), intent(in)  :: ocn_dms(:)
+    real(r8), intent(out) :: flux_dms(:)
+
+    ! local variables
+    integer  :: n
+    real(r8) :: sst_c
+    real(r8) :: scdms
+    real(r8) :: kwdms
+    real(r8), parameter :: Xconvxa= 6.97e-07  ! Wanninkhof's a=0.251 converted to ms-1/(ms-1)^2 
+    character(*),parameter :: subName = '(shr_flux_dms)'
+    !-----------------------------------------------------------------------
+
+    ! The following comes from the BLOM/iHAMOCC routine carchm.F90
+    ! See https://noresm-docs.readthedocs.io/en/noresm2/model-description/ocn_bgc_model.html
+    do n = 1, size(tocn)
+       sst_c = tocn(n) - loc_tkfrz
+       sst_c = min(40.,max(-3., sst_c))
+       scdms = 2855.7 + (-177.63 + (6.0438 + (-0.11645 + 0.00094743*sst_c)*sst_c)*sst_c)*sst_c
+       kwdms = Xconvxa * u10(n)**2 * (660./scdms)**0.5 
+       flux_dms(n) = -62.13 *kwdms * ocn_dms(n)
+    end do
+
+  end subroutine flux_atmOcn_dms
 
 end module shr_flux_mod
