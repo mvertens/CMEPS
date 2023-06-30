@@ -24,7 +24,7 @@ module shr_flux_mod
   public :: flux_atmOcn_dms       ! computes atm/ocn dms fluxes based on HAMOCC scheme
   public :: flux_atmOcn_bromo     ! computes atm/ocn bromo fluxes based on HAMOCC scheme
   public :: flux_MOstability      ! boundary layer stability scales/functions
-  public :: flux_adjust_constants ! adjust constant values used in flux calculations. (used by CAM as well)
+  public :: shr_flux_adjust_constants ! adjust constant values used in flux calculations. (used by CAM as well)
 
   ! !PRIVATE MEMBER FUNCTIONS:
   private :: psi_ua
@@ -79,26 +79,27 @@ module shr_flux_mod
 contains
 !===============================================================================
 
-  subroutine flux_adjust_constants( &
+  subroutine shr_flux_adjust_constants( &
        zvir, cpair, cpvir, karman, gravit, &
        latvap, latice, stebol, flux_convergence_tolerance, &
        flux_convergence_max_iteration, &
        coldair_outbreak_mod)
 
-    ! Adjust local constants.  Used to support simple models.
+    ! Adjust local constants. Note that this routine is called by CAM -
+    ! so this module must appear in the share code build.
     ! This routine sets module variables based on input arguments
 
-    real(R8), optional, intent(in) :: zvir
-    real(R8), optional, intent(in) :: cpair
-    real(R8), optional, intent(in) :: cpvir
-    real(R8), optional, intent(in) :: karman
-    real(R8), optional, intent(in) :: gravit
-    real(R8), optional, intent(in) :: latvap
-    real(R8), optional, intent(in) :: latice
-    real(R8), optional, intent(in) :: stebol
-    real(r8), optional, intent(in)  :: flux_convergence_tolerance
-    integer(in), optional, intent(in) :: flux_convergence_max_iteration
-    logical, optional, intent(in) :: coldair_outbreak_mod
+    real(R8) , optional, intent(in) :: zvir
+    real(R8) , optional, intent(in) :: cpair
+    real(R8) , optional, intent(in) :: cpvir
+    real(R8) , optional, intent(in) :: karman
+    real(R8) , optional, intent(in) :: gravit
+    real(R8) , optional, intent(in) :: latvap
+    real(R8) , optional, intent(in) :: latice
+    real(R8) , optional, intent(in) :: stebol
+    real(r8) , optional, intent(in) :: flux_convergence_tolerance
+    integer  , optional, intent(in) :: flux_convergence_max_iteration
+    logical  , optional, intent(in) :: coldair_outbreak_mod
     !----------------------------------------------------------------------------
 
     if (present(zvir))   loc_zvir   = zvir
@@ -113,7 +114,7 @@ contains
     if (present(flux_convergence_max_iteration)) flux_con_max_iter = flux_convergence_max_iteration
     if (present(coldair_outbreak_mod)) use_coldair_outbreak_mod = coldair_outbreak_mod
 
-  end subroutine flux_adjust_constants
+  end subroutine shr_flux_adjust_constants
 
   !===============================================================================
   ! !IROUTINE: flux_atmOcn -- internal atm/ocn flux calculation
@@ -2315,11 +2316,12 @@ contains
   end FUNCTION psit_30
 
   !===============================================================================
-  subroutine flux_atmOcn_dms(tocn, u10, ocn_dms, flux_dms)
+  subroutine flux_atmOcn_dms(mask, tocn, u10, ocn_dms, flux_dms)
 
     use shr_const_mod, only : tfrz => SHR_CONST_TKFRZ
 
-    ! input/output variables 
+    ! input/output variables
+    integer,  intent(in)  :: mask(:) ! ocn domain mask
     real(r8), intent(in)  :: tocn(:)
     real(r8), intent(in)  :: u10(:)
     real(r8), intent(in)  :: ocn_dms(:)
@@ -2330,29 +2332,34 @@ contains
     real(r8) :: sst_c
     real(r8) :: scdms
     real(r8) :: kwdms
-    real(r8), parameter :: Xconvxa= 6.97e-07  ! Wanninkhof's a=0.251 converted to ms-1/(ms-1)^2 
+    real(r8), parameter :: Xconvxa= 6.97e-07  ! Wanninkhof's a=0.251 converted to ms-1/(ms-1)^2
     character(*),parameter :: subName = '(flux_atmOcn_dms)'
     !-----------------------------------------------------------------------
 
     ! The following comes from the BLOM/iHAMOCC routine carchm.F90
     ! See https://noresm-docs.readthedocs.io/en/noresm2/model-description/ocn_bgc_model.html
     do n = 1, size(tocn)
-       sst_c = tocn(n) - loc_tkfrz
-       sst_c = min(40.,max(-3., sst_c))
-       scdms = 2855.7 + (-177.63 + (6.0438 + (-0.11645 + 0.00094743*sst_c)*sst_c)*sst_c)*sst_c
-       kwdms = Xconvxa * u10(n)**2 * (660./scdms)**0.5 
-       flux_dms(n) = -62.13 *kwdms * ocn_dms(n)
+       if (mask(n) /= 0) then
+          sst_c = tocn(n) - loc_tkfrz
+          sst_c = min(40.,max(-3., sst_c))
+          scdms = 2855.7 + (-177.63 + (6.0438 + (-0.11645 + 0.00094743*sst_c)*sst_c)*sst_c)*sst_c
+          kwdms = Xconvxa * u10(n)**2 * (660./scdms)**0.5
+          flux_dms(n) = -62.13 *kwdms * ocn_dms(n)
+       else
+          flux_dms(n) = 0._r8
+       end if
     end do
   end subroutine flux_atmOcn_dms
 
   !===============================================================================
-  subroutine flux_atmOcn_bromo(tocn, u10, psfc, ocn_bromo, flux_bromo)
+  subroutine flux_atmOcn_bromo(mask, tocn, u10, psfc, ocn_bromo, flux_bromo)
 
-    ! Determine bromoform flux
-    ! Stemmler et al. (2015; Biogeosciences) Eq. (8) 
+    ! Determine  bromoform flux [kg CHBr3 m-2 s-1]
+    ! Stemmler et al. (2015; Biogeosciences) Eq. (8)
     ! 1.e-2/3600 = conversion from [cm hr-1]/[m s-1]^2 to [ms-1]/[m s-1]^2
 
-    ! input/output variables 
+    ! input/output variables
+    integer,  intent(in)  :: mask(:) ! ocn domain mask
     real(r8), intent(in)  :: tocn(:)
     real(r8), intent(in)  :: u10(:)
     real(r8), intent(in)  :: psfc(:)
@@ -2372,16 +2379,23 @@ contains
     ! Atm bromoform concentration
     ! For now use 3.4ppt from Hense and Quack (2009; Biogeosciences) NEED TO
     ! should be updated WITH Ziska et al. (2013) climatology database
-    atm_bromo = 3.4_r8
 
+    ! Convert unit from kmol CHBr3/m^2 to kg/m^2/s.
+    ! Negative values to the atmosphere (positive downwards)
+
+    atm_bromo = 3.4_r8
     do n = 1,size(tocn)
-       sst_c = tocn(n) - loc_tkfrz
-       sst_c = min(40.,max(-3., sst_c))
-       sch_bromo = 4662.8 - 319.45*sst_c + 9.9012*sst_c**2 - 0.1159*sst_c**3
-       kw_bromo = 1.e-2/3600. * (0.222*u10(n)**2+0.33*u10(n))*(660./sch_bromo)**0.5
-       ! Henry's law constant [dimensionless] for Bromoform from Quack and Wallace (2003; GBC)
-       a_bromo = exp(13.16 - 4973*(1/tocn(n)))
-       flux_bromo(n) = kw_bromo * (atm_bromo/a_bromo*1e-12*psfc(n)*1e-5/(tocn(n)*0.083) - ocn_bromo(n))
+       if (mask(n) /= 0) then
+          sst_c = tocn(n) - loc_tkfrz
+          sst_c = min(40.,max(-3., sst_c))
+          sch_bromo = 4662.8 - 319.45*sst_c + 9.9012*sst_c**2 - 0.1159*sst_c**3
+          kw_bromo = 1.e-2/3600. * (0.222*u10(n)**2+0.33*u10(n))*(660./sch_bromo)**0.5
+          ! Henry's law constant [dimensionless] for Bromoform from Quack and Wallace (2003; GBC)
+          a_bromo = exp(13.16 - 4973*(1/tocn(n)))
+          flux_bromo(n) = 252.7 * kw_bromo * (atm_bromo/a_bromo*1e-12*psfc(n)*1e-5/(tocn(n)*0.083) - ocn_bromo(n))
+       else
+          flux_bromo(n) = 0._r8
+       end if
     end do
   end subroutine flux_atmOcn_bromo
 

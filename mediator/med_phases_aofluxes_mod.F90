@@ -121,7 +121,7 @@ module med_phases_aofluxes_mod
      real(R8) , pointer :: roce_HDO    (:) => null() ! ocn HDO ratio
      real(R8) , pointer :: roce_18O    (:) => null() ! ocn H218O ratio
      real(R8) , pointer :: dms_ocn     (:) => null() ! ocn dms concentration
-     real(R8) , pointer :: bromo_ocn   (:) => null() ! ocn bromo concentration
+     real(R8) , pointer :: brf_ocn     (:) => null() ! ocn brf concentration
 
      ! input: atm
      real(R8) , pointer :: zbot        (:) => null() ! atm level height
@@ -165,7 +165,7 @@ module med_phases_aofluxes_mod
      real(R8) , pointer :: re          (:) => null() ! saved re
      real(R8) , pointer :: ssq         (:) => null() ! saved sq
      real(R8) , pointer :: dms         (:) => null() ! ocn-> atm dms flux (optional) 
-     real(R8) , pointer :: bromo       (:) => null() ! ocn-> atm bromo flux (optional) 
+     real(R8) , pointer :: brf         (:) => null() ! ocn-> atm brf flux (optional) 
   end type aoflux_out_type
 
   character(*), parameter :: u_FILE_u = &
@@ -356,7 +356,7 @@ contains
     use ESMF            , only : ESMF_Field, ESMF_FieldGet, ESMF_FieldBundle
     use med_methods_mod , only : FB_fldchk    => med_methods_FB_FldChk
 #ifdef CESMCOUPLED
-    use shr_flux_mod, only : flux_adjust_constants
+    use shr_flux_mod    , only : shr_flux_adjust_constants
 #else
     use flux_atmocn_mod , only : flux_adjust_constants
 #endif
@@ -439,14 +439,24 @@ contains
     else
        compute_dms_flux = .false.
     end if
+#ifdef CESMCOUPLED
+    if (maintask) then
+       write(logunit,'(a,l)')trim(subname)//' computing dms flux is ',compute_dms_flux 
+    end if
+#endif
 
     ! Determine if bromo flux will be computed in mediator
-    if ( FB_fldchk(is_local%wrap%FBImp(compocn,compocn), 'So_bromo', rc=rc ) .and. &
-         FB_fldchk(is_local%wrap%FBExp(compocn), 'Faox_bromo', rc=rc)) then
+    if ( FB_fldchk(is_local%wrap%FBImp(compocn,compocn), 'So_brf', rc=rc ) .and. &
+         FB_fldchk(is_local%wrap%FBExp(compocn), 'Faox_brf', rc=rc)) then
        compute_bromo_flux = .true.
     else
        compute_bromo_flux = .false.
     end if
+#ifdef CESMCOUPLED
+    if (maintask) then
+       write(logunit,'(a,l)')trim(subname)//' computing bromo flux is ',compute_bromo_flux 
+    end if
+#endif
 
     !----------------------------------
     ! Initialize aoflux
@@ -489,10 +499,17 @@ contains
        flux_convergence = 0.0_r8
     end if
 
+#ifdef CESMCOUPLED
+    call shr_flux_adjust_constants(&
+         flux_convergence_tolerance=flux_convergence, &
+         flux_convergence_max_iteration=flux_max_iteration, &
+         coldair_outbreak_mod=coldair_outbreak_mod)
+#else
     call flux_adjust_constants(&
          flux_convergence_tolerance=flux_convergence, &
          flux_convergence_max_iteration=flux_max_iteration, &
          coldair_outbreak_mod=coldair_outbreak_mod)
+#endif
 
     if (dbug_flag > 5) then
       call ESMF_LogWrite(trim(subname)//": done", ESMF_LOGMSG_INFO)
@@ -1125,14 +1142,16 @@ contains
     ! flux is downwards positive - therefore negative values to
     ! the atmosphere (this is the opposite of what is there in BLOM)
     if (compute_dms_flux) then
-       call flux_atmocn_dms(aoflux_in%tocn, aoflux_out%u10, aoflux_in%dms_ocn, aoflux_out%dms)
+       call flux_atmocn_dms(aoflux_in%mask, aoflux_in%tocn, aoflux_out%u10, aoflux_in%dms_ocn, &
+            aoflux_out%dms)
     end if
 
     ! compute BROMO fluxes to atm and ocn in in kg/m2/s
     ! flux is downwards positive - therefore negative values to
     ! the atmosphere (this is the opposite of what is there in BLOM)
     if (compute_bromo_flux) then
-       call flux_atmocn_bromo(aoflux_in%tocn, aoflux_out%u10, aoflux_in%psfc, aoflux_in%dms_ocn, aoflux_out%dms)
+       call flux_atmocn_bromo(aoflux_in%mask, aoflux_in%tocn, aoflux_out%u10, aoflux_in%psfc, aoflux_in%brf_ocn, &
+            aoflux_out%brf)
     end if
 
     !----------------------------------
@@ -1707,7 +1726,7 @@ end subroutine med_aofluxes_map_ogrid2xgrid_input
        if (chkerr(rc,__LINE__,u_FILE_u)) return
     end if
     if ( compute_bromo_flux) then
-       call fldbun_getfldptr(fldbun_o, 'So_bromo', aoflux_in%bromo_ocn, xgrid=xgrid, rc=rc)
+       call fldbun_getfldptr(fldbun_o, 'So_brf', aoflux_in%brf_ocn, xgrid=xgrid, rc=rc)
        if (chkerr(rc,__LINE__,u_FILE_u)) return
     end if
 
@@ -1769,7 +1788,7 @@ end subroutine med_aofluxes_map_ogrid2xgrid_input
        if (chkerr(rc,__LINE__,u_FILE_u)) return
     end if
     if (compute_bromo_flux) then
-       call fldbun_getfldptr(fldbun, 'Faox_bromo', aoflux_out%bromo, xgrid=xgrid, rc=rc)
+       call fldbun_getfldptr(fldbun, 'Faox_brf', aoflux_out%brf, xgrid=xgrid, rc=rc)
        if (chkerr(rc,__LINE__,u_FILE_u)) return
     end if
 

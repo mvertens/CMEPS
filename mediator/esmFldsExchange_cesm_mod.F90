@@ -3299,37 +3299,38 @@ contains
        call addfld_to(compocn, 'Faox_dms')
        call addfld_to(compatm, 'Faxx_dms')
     else
-       if (trim(is_local%wrap%aoflux_grid) == 'ogrid') then
-          ! TODO: extend this to to agrid and xgrid
-          if (fldchk(is_local%wrap%FBexp(compatm), 'Faxx_dms', rc=rc)) then
-             call addmrg_to(compatm , 'Faxx_dms', &
-                  mrg_from=compmed, mrg_fld='Faox_dms', mrg_type='merge', mrg_fracname='ofrac')
-          end if
-          if ( fldchk(is_local%wrap%FBexp(compocn), 'Faox_dms', rc=rc) .and. &
-               fldchk(is_local%wrap%FBImp(compocn,compocn), 'So_dms', rc=rc) ) then
-             call addmrg_to(compocn, 'Faox_dms', &
-                  mrg_from=compmed, mrg_fld='Faox_dms', mrg_type='merge', mrg_fracname='ofrac')
-          end if
-       else
-          call ESMF_LogWrite(trim(subname)//&
-               ": only ogrid has been enabled for dms flux computation", &
-               ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u)
-          rc = ESMF_FAILURE
-          return
+       if (fldchk(is_local%wrap%FBexp(compatm), 'Faxx_dms', rc=rc)) then
+          call addmrg_to(compatm , 'Faxx_dms', &
+               mrg_from=compmed, mrg_fld='Faox_dms', mrg_type='merge', mrg_fracname='ofrac')
+       end if
+       if ( fldchk(is_local%wrap%FBexp(compocn), 'Faox_dms', rc=rc) .and. &
+            fldchk(is_local%wrap%FBImp(compocn,compocn), 'So_dms', rc=rc) ) then
+          call addmrg_to(compocn, 'Faox_dms', &
+               mrg_from=compmed, mrg_fld='Faox_dms', mrg_type='merge', mrg_fracname='ofrac')
        end if
     end if
 
-    ! Get dms flux from ocn and send to atm (this is a deprecated functionality - only used for testing now)
-    ! TODO: remove this 
+    !=====================================================================
+    ! Bromoform EXCHANGE
+    !=====================================================================
+
+    ! TODO: add option to get bromoform from atm
+
+    ! Get brf concentration from ocn and compute brf flux in mediator and send to both atm and ocn
     if (phase == 'advertise') then
-       call addfld_from(compocn, 'Faoo_dms')
-       call addfld_to(compatm, 'Faxx_dms')
+       call addfld_aoflux('Faox_brf')
+       call addfld_from(compocn, 'So_brf')
+       call addfld_to(compocn, 'Faox_brf')
+       call addfld_to(compatm, 'Faxx_brf')
     else
-       ! Note that Faoo_dmds should not be weighted by ifrac - since
-       ! it will be weighted by ifrac in the merge to the atm
-       if (fldchk(is_local%wrap%FBexp(compatm), 'Faxx_dms', rc=rc)) then
-          call addmrg_to(compatm , 'Faxx_dms', &
-               mrg_from=compmed, mrg_fld='Faoo_dms', mrg_type='merge', mrg_fracname='ofrac')
+       if (fldchk(is_local%wrap%FBexp(compatm), 'Faxx_brf', rc=rc)) then
+          call addmrg_to(compatm , 'Faxx_brf', &
+               mrg_from=compmed, mrg_fld='Faox_brf', mrg_type='merge', mrg_fracname='ofrac')
+       end if
+       if ( fldchk(is_local%wrap%FBexp(compocn), 'Faox_brf', rc=rc) .and. &
+            fldchk(is_local%wrap%FBImp(compocn,compocn), 'So_brf', rc=rc) ) then
+          call addmrg_to(compocn, 'Faox_brf', &
+               mrg_from=compmed, mrg_fld='Faox_brf', mrg_type='merge', mrg_fracname='ofrac')
        end if
     end if
 
