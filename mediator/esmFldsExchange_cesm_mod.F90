@@ -3299,14 +3299,25 @@ contains
        call addfld_to(compocn, 'Faox_dms')
        call addfld_to(compatm, 'Faxx_dms')
     else
-       if (fldchk(is_local%wrap%FBexp(compatm), 'Faxx_dms', rc=rc)) then
-          call addmrg_to(compatm , 'Faxx_dms', &
-               mrg_from=compmed, mrg_fld='Faox_dms', mrg_type='merge', mrg_fracname='ofrac')
-       end if
+       ! Faox_dms sent back to ocn
        if ( fldchk(is_local%wrap%FBexp(compocn), 'Faox_dms', rc=rc) .and. &
             fldchk(is_local%wrap%FBImp(compocn,compocn), 'So_dms', rc=rc) ) then
           call addmrg_to(compocn, 'Faox_dms', &
                mrg_from=compmed, mrg_fld='Faox_dms', mrg_type='merge', mrg_fracname='ofrac')
+       end if
+
+       ! Faox_dms sent back to atm
+       if (fldchk(is_local%wrap%FBexp(compatm), 'Faxx_dms', rc=rc)) then
+          if (fldchk(is_local%wrap%FBImp(compocn,compocn), 'So_dms', rc=rc) ) then
+             call addmrg_to(compatm , 'Faxx_dms', &
+                  mrg_from=compmed, mrg_fld='Faox_dms', mrg_type='merge', mrg_fracname='ofrac')
+          else
+             call ESMF_LogWrite(trim(subname)//&
+                  ": Bromo concentration is not being sent from ocean - so bromoform flux to atm cannot be computed", &
+                  ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u)
+             rc = ESMF_FAILURE
+             return
+          end if
        end if
     end if
 
@@ -3315,7 +3326,6 @@ contains
     !=====================================================================
 
     ! TODO: add option to get bromoform from atm
-
     ! Get brf concentration from ocn and compute brf flux in mediator and send to both atm and ocn
     if (phase == 'advertise') then
        call addfld_aoflux('Faox_brf')
@@ -3323,14 +3333,25 @@ contains
        call addfld_to(compocn, 'Faox_brf')
        call addfld_to(compatm, 'Faxx_brf')
     else
-       if (fldchk(is_local%wrap%FBexp(compatm), 'Faxx_brf', rc=rc)) then
-          call addmrg_to(compatm , 'Faxx_brf', &
-               mrg_from=compmed, mrg_fld='Faox_brf', mrg_type='merge', mrg_fracname='ofrac')
-       end if
+       ! Faox_brf sent back to ocn
        if ( fldchk(is_local%wrap%FBexp(compocn), 'Faox_brf', rc=rc) .and. &
             fldchk(is_local%wrap%FBImp(compocn,compocn), 'So_brf', rc=rc) ) then
           call addmrg_to(compocn, 'Faox_brf', &
                mrg_from=compmed, mrg_fld='Faox_brf', mrg_type='merge', mrg_fracname='ofrac')
+       end if
+
+       ! Faox_brf sent back to atm
+       if (fldchk(is_local%wrap%FBexp(compatm), 'Faxx_brf', rc=rc)) then
+          if (fldchk(is_local%wrap%FBImp(compocn,compocn), 'So_brf', rc=rc) ) then
+             call addmrg_to(compatm , 'Faxx_brf', &
+                  mrg_from=compmed, mrg_fld='Faox_brf', mrg_type='merge', mrg_fracname='ofrac')
+          else
+             call ESMF_LogWrite(trim(subname)//&
+                  ": Bromo concentration is not being sent from ocean - so bromoform flux to atm cannot be computed", &
+                  ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u)
+             rc = ESMF_FAILURE
+             return
+          end if
        end if
     end if
 

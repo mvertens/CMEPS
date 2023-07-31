@@ -22,7 +22,7 @@ module shr_flux_mod
   public :: flux_atmOcn_diurnal   ! computes atm/ocn fluxes with diurnal cycle
   public :: flux_atmOcn_UA        ! computes atm/ocn fluxes using University of Ariz algorithm (Zeng et al., 1998)
   public :: flux_atmOcn_dms       ! computes atm/ocn dms fluxes based on HAMOCC scheme
-  public :: flux_atmOcn_bromo     ! computes atm/ocn bromo fluxes based on HAMOCC scheme
+  public :: flux_atmOcn_brf       ! computes atm/ocn brf fluxes based on HAMOCC scheme
   public :: flux_MOstability      ! boundary layer stability scales/functions
   public :: shr_flux_adjust_constants ! adjust constant values used in flux calculations. (used by CAM as well)
 
@@ -2352,9 +2352,9 @@ contains
   end subroutine flux_atmOcn_dms
 
   !===============================================================================
-  subroutine flux_atmOcn_bromo(mask, tocn, u10, psfc, ocn_bromo, flux_bromo)
+  subroutine flux_atmOcn_brf(mask, tocn, u10, psfc, ocn_bromo, flux_bromo)
 
-    ! Determine  bromoform flux [kg CHBr3 m-2 s-1]
+    ! Determine bromoform flux [kg CHBr3 m-2 s-1]
     ! Stemmler et al. (2015; Biogeosciences) Eq. (8)
     ! 1.e-2/3600 = conversion from [cm hr-1]/[m s-1]^2 to [ms-1]/[m s-1]^2
 
@@ -2373,7 +2373,7 @@ contains
     real(r8) :: kw_bromo
     real(r8) :: a_bromo
     real(r8) :: atm_bromo
-    character(*),parameter :: subName = '(flux_atmOcn_bromo) '
+    character(*),parameter :: subName = '(flux_atmOcn_brf) '
     !-----------------------------------------------------------------------
 
     ! Atm bromoform concentration
@@ -2397,6 +2397,6 @@ contains
           flux_bromo(n) = 0._r8
        end if
     end do
-  end subroutine flux_atmOcn_bromo
+  end subroutine flux_atmOcn_brf
 
 end module shr_flux_mod
