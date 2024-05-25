@@ -5,7 +5,7 @@ module med_merge_mod
   !-----------------------------------------------------------------------------
 
   use med_kind_mod          , only : CX=>SHR_KIND_CX, CS=>SHR_KIND_CS, CL=>SHR_KIND_CL, R8=>SHR_KIND_R8
-  use med_internalstate_mod , only : logunit, compmed, compname
+  use med_internalstate_mod , only : logunit, compmed, compname, maintask
   use med_constants_mod     , only : dbug_flag         => med_constants_dbug_flag
   use med_constants_mod     , only : czero             => med_constants_czero
   use med_utils_mod         , only : ChkErr            => med_utils_ChkErr
@@ -356,6 +356,10 @@ contains
           return
        end if
     end if
+    if (.not. FB_FldChk(FB, trim(FBfld), rc=rc)) then
+       call ESMF_LogWrite(trim(subname)//": error FBfld "//trim(FBfld)//" is not in FB", &
+            ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u)
+    end if
 
     !-------------------------
     ! Get appropriate field pointers
@@ -363,7 +367,11 @@ contains
 
     ! Get input field
     call ESMF_FieldBundleGet(FB, FBfld, field=field_in, rc=rc)
-    if (chkerr(rc,__LINE__,u_FILE_u)) return
+    if (chkerr(rc,__LINE__,u_FILE_u)) then
+       call ESMF_LogWrite(trim(subname)//": error FBfld is "//trim(FBfld), &
+            ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u)
+       return
+    end if
 
     ! Get field pointer to output and input fields
     ! Assume that input and output ungridded upper bounds are the same - this is checked in error check
