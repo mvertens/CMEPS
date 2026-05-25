@@ -23,6 +23,11 @@ def gen_runseq(case, coupling_times):
     xcompset       = case.get_value("COMP_ATM") == 'xatm'
     cpl_add_aoflux = not xcompset and case.get_value('ADD_AOFLUX_TO_RUNSEQ')
 
+    has_prep_ice = True
+    if case.get_value("COMP_ICE") == "dice":
+        if case.get_value("DICE_MODE") == "MEPS":
+            has_prep_ice = False
+
     # It is assumed that if a component will be run it will send information to the mediator
     # so the flags run_xxx and xxx_to_med are redundant
 
@@ -114,8 +119,9 @@ def gen_runseq(case, coupling_times):
         runseq.add_action("MED med_phases_prep_lnd"        , med_to_lnd)
         runseq.add_action("MED -> LND :remapMethod=redist" , med_to_lnd)
 
-        runseq.add_action("MED med_phases_prep_ice"        , med_to_ice)
-        runseq.add_action("MED -> ICE :remapMethod=redist" , med_to_ice)
+        if has_prep_ice:
+            runseq.add_action("MED med_phases_prep_ice"        , med_to_ice)
+            runseq.add_action("MED -> ICE :remapMethod=redist" , med_to_ice)
 
         runseq.add_action("MED med_phases_prep_wav_accum"  , med_to_wav)
         runseq.add_action("MED med_phases_prep_wav_avg"    , med_to_wav)
