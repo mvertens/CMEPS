@@ -109,18 +109,67 @@ Accumulators
      component coupled less frequently (the accumulate-then-average pattern seen
      in the :ref:`run sequence <run-sequence>` for the ocean).
 
-Reading the ``FBImp`` matrix
-----------------------------
+The coupling matrix
+-------------------
 
-The ``FBImp(n,k)`` matrix repays a second look, because it is the mechanism
-behind most of the ``prep`` and ``post`` phases:
+Which components exchange fields — and therefore which off-diagonal
+``FBImp(n,k)`` entries are populated and which ``prep`` / ``post`` work runs — is
+captured by a **coupling matrix** that the mediator prints at start-up. Rows are
+the *source* (``from``) component and columns are the *destination* (``to``)
+component; a ``T`` marks an active coupling from the row component to the column
+component.
 
-* A ``post_<comp>`` phase for component ``n`` takes the diagonal
-  ``FBImp(n,n)`` — which points into ``NStateImp(n)`` — and maps it across the
-  row, producing ``FBImp(n,k)`` for every destination grid ``k`` that needs it.
-* A ``prep_<comp>`` phase for a destination component ``k`` reads down the
-  column — pulling ``FBImp(n,k)`` for each source component ``n`` — and merges
-  those already-on-grid fields into ``FBExp(k)``.
+CMEPS prints two versions, which mirror the :ref:`advertise/realize
+<field-exchange>` superset-vs-intersection idea.
+
+The **allowed** coupling matrix is every coupling CMEPS supports (the superset):
+
+.. code-block:: none
+
+   from  to ->  med  atm  lnd  ocn  ice  rof  wav  glc1 glc2
+   med           -    -    -    -    -    -    -    -    -
+   atm           -    -    T    T    T    -    T    -    -
+   lnd           -    T    -    -    -    T    -    T    T
+   ocn           -    T    -    -    T    -    T    T    T
+   ice           -    T    -    T    -    -    T    -    -
+   rof           -    -    T    T    T    -    -    -    -
+   wav           -    T    -    T    T    -    -    -    -
+   glc1          -    -    T    -    T    T    -    -    -
+   glc2          -    -    T    -    T    T    -    -    -
+
+The **active** coupling matrix is the subset actually turned on for a given
+configuration. In the example below the wave component is not active, so its row
+and column drop out:
+
+.. code-block:: none
+
+   from  to ->  med  atm  lnd  ocn  ice  rof  wav  glc1 glc2
+   med           -    -    -    -    -    -    -    -    -
+   atm           -    -    T    T    T    -    -    -    -
+   lnd           -    T    -    -    -    T    -    T    T
+   ocn           -    T    -    -    T    -    -    T    T
+   ice           -    T    -    T    -    -    -    -    -
+   rof           -    -    T    T    T    -    -    -    -
+   wav           -    -    -    -    -    -    -    -    -
+   glc1          -    -    T    -    T    T    -    -    -
+   glc2          -    -    T    -    T    T    -    -    -
+
+Reading the matrix ties directly back to the internal state. Each active
+coupling is stored as one off-diagonal ``FBImp`` entry:
+
+.. code-block:: none
+
+   an active coupling   atm -> ocn        (a "T" in the matrix above)
+   is stored as         FBImp(atm, ocn)   =  atm fields on the ocn grid
+
+and it ties back to the phases. For each active coupling ``X -> Y``:
+
+* ``post_X`` maps ``X``'s fields onto ``Y``'s grid (filling ``FBImp(X,Y)``), and
+* ``prep_Y`` merges those mapped fields — with the other active sources into
+  ``Y`` — into ``FBExp(Y)``.
+
+So a **row** shows everything a component feeds (its ``post`` targets), and a
+**column** shows everything that feeds a component (its ``prep`` sources).
 
 Where to go next
 ================
