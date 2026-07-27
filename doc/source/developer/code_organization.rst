@@ -138,8 +138,11 @@ The **allowed** coupling matrix is every coupling CMEPS supports (the superset):
    glc2          -    -    T    -    T    T    -    -    -
 
 The **active** coupling matrix is the subset actually turned on for a given
-configuration. In the example below the wave component is not active, so its row
-and column drop out:
+configuration — mirroring how NUOPC realizes only the connected fields. Two
+examples follow.
+
+A fully coupled system without an active wave component (its row and column drop
+out):
 
 .. code-block:: none
 
@@ -153,6 +156,29 @@ and column drop out:
    wav           -    -    -    -    -    -    -    -    -
    glc1          -    -    T    -    T    T    -    -    -
    glc2          -    -    T    -    T    T    -    -    -
+
+A configuration with active **CAM**, **CLM** and **CICE** (atm, lnd, ice) and
+**data** ocean (DOCN) and land-ice (DGLC):
+
+.. code-block:: none
+
+   from  to ->  med  atm  lnd  ocn  ice  rof  wav  glc1 glc2
+   med           -    -    -    -    -    -    -    -    -
+   atm           -    -    T    -    T    -    -    -    -
+   lnd           -    T    -    -    -    T    -    T    T
+   ocn           -    T    -    -    T    -    -    -    -
+   ice           -    T    -    -    -    -    -    -    -
+   rof           -    -    T    -    T    -    -    -    -
+   wav           -    -    -    -    -    -    -    -    -
+   glc1          -    -    T    -    T    T    -    -    -
+   glc2          -    -    T    -    T    T    -    -    -
+
+Notice how the **data** components change the picture. Nothing needs to *force*
+the data ocean, so ``atm -> ocn``, ``ice -> ocn`` and ``rof -> ocn`` all go
+inactive — but DOCN still provides its prescribed state *to* the atmosphere and
+ice (``ocn -> atm``, ``ocn -> ice`` stay active). A data component is coupled
+where it is a *source*, and decoupled where it would be a *destination* of
+fields it does not consume.
 
 Reading the matrix ties directly back to the internal state. Each active
 coupling is stored as one off-diagonal ``FBImp`` entry:
@@ -170,10 +196,3 @@ and it ties back to the phases. For each active coupling ``X -> Y``:
 
 So a **row** shows everything a component feeds (its ``post`` targets), and a
 **column** shows everything that feeds a component (its ``prep`` sources).
-
-Where to go next
-================
-
-* :ref:`architecture` — the high-level grouping and the coupled step.
-* The phase lifecycle and the per-component ``prep`` / ``post`` phases (next).
-* :ref:`concepts` — the vocabulary these structures implement.
