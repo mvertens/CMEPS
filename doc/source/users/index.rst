@@ -42,3 +42,4 @@ CESM/NorESM case is configured to produce them.
    run_sequence
    runconfig
    running
+   fields
