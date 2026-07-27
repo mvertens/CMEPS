@@ -1,0 +1,23 @@
+(internalstate allowed coupling) Allowed coupling flags
+  |from to -> med  atm  lnd  ocn  ice  rof  wav  glc1 glc2
+  |med         -    -    -    -    -    -    -    -    -
+  |atm         -    -    T    T    T    -    T    -    -
+  |lnd         -    T    -    -    -    T    -    T    T
+  |ocn         -    T    -    -    T    -    T    T    T
+  |ice         -    T    -    T    -    -    T    -    -
+  |rof         -    -    T    T    T    -    -    -    -
+  |wav         -    T    -    T    T    -    -    -    -
+  |glc1        -    -    T    -    T    T    -    -    -
+  |glc2        -    -    T    -    T    T    -    -    -
+
+ (internalstate allowed coupling)  Active coupling flags
+  |from to -> med  atm  lnd  ocn  ice  rof  wav  glc1 glc2
+  |med         -    -    -    -    -    -    -    -    -
+  |atm         -    -    T    T    T    -    -    -    -
+  |lnd         -    T    -    -    -    T    -    T    T
+  |ocn         -    T    -    -    T    -    -    T    T
+  |ice         -    T    -    T    -    -    -    -    -
+  |rof         -    -    T    T    T    -    -    -    -
+  |wav         -    -    -    -    -    -    -    -    -
+  |glc1        -    -    T    -    T    T    -    -    -
+  |glc2        -    -    T    -    T    T    -    -    -
