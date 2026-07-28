@@ -28,7 +28,7 @@ consumes fall into a few groups:
   (``esmFldsExchange_<host>_mod.F90`` and ``fd_<host>.yaml``) and which custom
   ``prep`` calculations are used.
 * **Atmosphere/ocean flux options** — for example ``aoflux_grid`` (the grid on
-  which the air-sea fluxes are computed) and ``aoflux_code``.
+  which the air-sea fluxes are computed) and ``ocn_surface_flux_scheme``.
 * **Diagnostics and budgets** — for example ``do_budgets`` (enable the water and
   energy budget diagnostics).
 * **Profiling and debugging** — for example ``Profiling`` and ``dbug_flag``.
