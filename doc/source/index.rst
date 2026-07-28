@@ -47,16 +47,3 @@ This documentation is organized into four parts:
    :caption: Reference
 
    reference/index
-
-.. Legacy pages retained (hidden) while their content is migrated into the
-   four parts above. Remove entries here as each page is retired.
-.. toctree::
-   :hidden:
-   :caption: Legacy (being migrated)
-
-   introduction
-   esmflds
-   fractions
-   generic
-   prep
-   addendum/index

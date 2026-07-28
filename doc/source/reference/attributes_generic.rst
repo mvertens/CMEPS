@@ -1,8 +1,8 @@
 .. _attributes:
 
-==========================================
- CMEPS Application Independent Attributes
-==========================================
+==================================
+Application-independent attributes
+==================================
 
 The following attributes are obtained from the respective driver and
 available to all components that the driver uses.  In the case of
@@ -24,7 +24,7 @@ General
   CMEPS and is also leveraged in some of the custom calculations in
   the ``prep`` modules.
 
-  The currently supported values for ``coupling_mode`` are ``cesm``, ``ufs.(frac,nfrac).(aoflux)``, and ``hafs``.
+  The currently supported values for ``coupling_mode`` are ``cesm``, ``noresm``, ``ufs.(frac,nfrac).(aoflux)``, and ``hafs``.
 
 Scalar attributes
 -----------------
@@ -61,8 +61,8 @@ Mediator history and restart attributes
 ---------------------------------------
 
 **history_option**, **history_n** (required)
-  Determines the write frequency for a mediator history file (see :ref:`mediator history writes<history_writes>`).
+  Determines the write frequency for a mediator history file (see :ref:`mediator history writes <history>`).
 **restart_option**, **restart_n** (required)
-  Determines the write frequency for a mediator restart file (see :ref:`mediator restart writes<restart_writes>`).
+  Determines the write frequency for a mediator restart file (see :ref:`mediator restart writes <restart>`).
 **read_restart** (required)
   Determines if a mediator restart file is read in.

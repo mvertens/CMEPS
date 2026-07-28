@@ -38,7 +38,8 @@ Which bulk-flux scheme is used, and its options, come from run-configuration
 attributes:
 
 * ``coupling_mode`` — the target modeling system that will compute the
-  atmosphere-ocean fluxes. Valid values are ``cesm``, ``noresm`` and ``ufs``.
+  atmosphere-ocean fluxes. Valid values are ``cesm``, ``noresm``,
+  ``ufs.(frac,nfrac).(aoflux)`` and ``hafs``.
 * ``aoflux_grid`` — the grid the atmosphere-ocean flux computation is done on:
   ``agrid`` (atmosphere), ``ogrid`` (ocean), or ``xgrid`` (the ESMF exchange
   grid). This is described in detail in `The flux calculation grid`_ below.

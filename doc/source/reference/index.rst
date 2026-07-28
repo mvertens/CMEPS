@@ -10,3 +10,8 @@ throughout the documentation.
 
 .. toctree::
    :maxdepth: 2
+
+   field_names
+   attributes_generic
+   attributes_cesm
+   glossary
