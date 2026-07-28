@@ -23,27 +23,8 @@ This documentation is organized into four parts:
 .. toctree::
    :maxdepth: 2
    :numbered:
-   :caption: Overview & Concepts
 
    overview/index
-
-.. toctree::
-   :maxdepth: 2
-   :numbered:
-   :caption: User Guide
-
    users/index
-
-.. toctree::
-   :maxdepth: 2
-   :numbered:
-   :caption: Developer Guide
-
    developer/index
-
-.. toctree::
-   :maxdepth: 2
-   :numbered:
-   :caption: Reference
-
    reference/index

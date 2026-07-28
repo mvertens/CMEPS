@@ -4,20 +4,6 @@
 User Guide
 ##########
 
-This part is for people configuring and running a coupled system that uses the
-CMEPS mediator.
-
-A coupled run is driven by **two key inputs that the NUOPC driver ingests** at
-start-up:
-
-* the **run sequence** — the ordered recipe of component runs, mediator phases
-  and field transfers, together with the coupling intervals (:ref:`run-sequence`); and
-* the **run configuration** — the attributes the driver and the mediator read
-  (:ref:`run-config`).
-
-The pages below describe each of these two inputs in turn, and then show how a
-CESM/NorESM case is configured to produce them.
-
 .. important::
 
    **This User Guide is specific to CESM and NorESM.** Because the driver, the
@@ -30,6 +16,17 @@ CESM/NorESM case is configured to produce them.
    The mediator itself is shared across applications, so the :ref:`Overview
    <overview>` and :ref:`Developer Guide <developer>` are not host-specific —
    only this User Guide is.
+
+A coupled run is driven by **two key inputs that the NUOPC driver ingests** at
+start-up:
+
+* the **run sequence** — the ordered recipe of component runs, mediator phases
+  and field transfers, together with the coupling intervals (:ref:`run-sequence`); and
+* the **run configuration** — the attributes the driver and the mediator read
+  (:ref:`run-config`).
+
+The pages below describe each of these two inputs in turn, and then show how a
+CESM/NorESM case is configured to produce them.
 
 .. toctree::
    :maxdepth: 2
