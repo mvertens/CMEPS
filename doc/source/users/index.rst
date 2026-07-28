@@ -31,11 +31,6 @@ CESM/NorESM case is configured to produce them.
    <overview>` and :ref:`Developer Guide <developer>` are not host-specific —
    only this User Guide is.
 
-.. note::
-
-   This part is being written. More sections will be added here as the rewrite
-   proceeds. See :ref:`overview` for the concepts these pages build on.
-
 .. toctree::
    :maxdepth: 2
 
