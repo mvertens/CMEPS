@@ -41,3 +41,5 @@ differs by host, it is in the ``esmFldsExchange_<host>`` exchange modules and th
    code_organization
    field_exchange
    phase_lifecycle
+   mapping
+   merging
