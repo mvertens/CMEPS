@@ -46,3 +46,6 @@ differs by host, it is in the ``esmFldsExchange_<host>`` exchange modules and th
    fractions
    aofluxes
    ocnalb
+   diagnostics
+   history
+   restart
