@@ -101,3 +101,35 @@ Putting the pieces together for a CESM/NorESM case:
 
 For the details of the two files the driver ingests, see :ref:`run-sequence` and
 :ref:`run-config`.
+
+Branch runs and the coupler restart pointer
+===========================================
+
+A **branch run** continues exactly from another case's restarts, so the mediator
+reads its coupler restart. In addition to the usual branch settings, you must set
+the **coupler restart pointer** explicitly to the dated ``rpointer.cpl`` file of
+the reference case:
+
+.. code-block:: bash
+
+   ./xmlchange RUN_STARTDATE=1990-01-01
+   ./xmlchange RUN_REFDATE=1990-01-01
+   ./xmlchange DRV_RESTART_POINTER=rpointer.cpl.1990-01-01-00000
+
+The coupler restart pointer files are **dated** — for example
+``rpointer.cpl.1850-01-06-00000`` for a restart written at that timestamp.
+Setting ``DRV_RESTART_POINTER`` explicitly for a branch run is **by design**:
+
+* On a **continue** run (``CONTINUE_RUN=TRUE``), CIME already knows the exact
+  restart it just wrote and automatically sets ``DRV_RESTART_POINTER`` to that
+  dated pointer, so you never touch it.
+* On a **branch** run, you are instead choosing *which* restart of a reference
+  case to resume from — information CIME does not have on its own
+  (``RUN_REFDATE`` gives the date, but the reference case may hold several
+  restart snapshots). So you name the pointer yourself, consistent with the
+  ``RUN_REFCASE`` / ``RUN_REFDATE`` you already set.
+
+.. note::
+
+   A **hybrid** run does not read the coupler restart at all, so the pointer does
+   not apply there.
