@@ -71,7 +71,7 @@ is done by changing the run sequence.
      the same mediator code serves them all.
    * The mediator does not parse the run sequence; it simply registers the
      ``MED`` phases that the run sequence names.
-   * The mediator reads only the *attributes* the driver sets from the run
+   * The mediator obtains only the *attributes* the driver sets from the run
      configuration, not the host-specific configuration file itself.
    * The mediator is designed to be host-agnostic to the greatest extent
      possible — a small number of host-specific ``#ifdef`` blocks remain that

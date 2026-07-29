@@ -85,7 +85,7 @@ Each ``histaux`` stream is defined by one or more numbered *file slots*
 Default histaux streams
 -----------------------
 
-These settings are available as **NUOPC attributes**, read in during
+These settings are available as **NUOPC attributes**, obtained during
 initialization in ``med_phases_history_mod.F90``. The default file slots are
 summarized below; all can be overridden in ``user_nl_cpl``.
 

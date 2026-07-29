@@ -22,7 +22,8 @@ start-up:
 
 * the **run sequence** — the ordered recipe of component runs, mediator phases
   and field transfers, together with the coupling intervals (:ref:`run-sequence`); and
-* the **run configuration** — the attributes the driver and the mediator read
+* the **run configuration** — the ESMF attributes the driver reads at initialization and shares
+  with the mediator and other model components.
   (:ref:`run-config`).
 
 The pages below describe each of these two inputs in turn, and then show how a

@@ -96,7 +96,7 @@ Putting the pieces together for a CESM/NorESM case:
    configuration (``nuopc.runconfig``), folding in the driver and mediator
    attributes — including any values you set in ``user_nl_cpl``.
 #. At run time the driver ingests the run configuration and run sequence, and
-   the mediator reads the attributes it needs and executes the ``MED`` phases in
+   the mediator obtains the attributes it needs and executes the ``MED`` phases in
    the order the run sequence specifies.
 
 For the details of the two files the driver ingests, see :ref:`run-sequence` and
