@@ -1,8 +1,8 @@
 .. _run-config:
 
-=====================
-The run configuration
-=====================
+==============================
+NUOPC attributes (CESM/NorESM)
+==============================
 
 This page covers the CESM/NorESM run configuration and the attributes the
 mediator obtains from it. For what a run configuration *is* and how it relates to
@@ -73,8 +73,8 @@ and set, so optional attributes can fall back to defaults. The attributes CMEPS
 consumes fall into a few groups:
 
 * **Coupling mode** — ``coupling_mode`` selects which host exchange logic
-  (``esmFldsExchange_<host>_mod.F90`` and ``fd_<host>.yaml``) and which custom
-  ``prep`` calculations are used.
+  (``esmFldsExchange_<host>_mod.F90``) and which custom ``prep`` calculations
+  are used.
 * **Atmosphere/ocean flux options** — for example ``aoflux_grid`` (the grid on
   which the air-sea fluxes are computed) and ``ocn_surface_flux_scheme``.
 * **Diagnostics and budgets** — for example ``do_budgets`` (enable the water and

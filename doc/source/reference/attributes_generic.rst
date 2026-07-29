@@ -6,9 +6,9 @@ Application-independent attributes
 
 The following attributes are obtained from the respective driver and
 available to all components that the driver uses.  In the case of
-UFS, the UFS driver ingests these attributes from the
-``ufs.configure`` file.  In the case of CESM, the CESM driver ingests
-these attributes from the ``nuopc.runconfig`` file.  The list of
+CESM/NorESM, the driver ingests these attributes from the
+``nuopc.runconfig`` file.  In the case of UFS, the UFS driver ingests
+these attributes from the ``ufs.configure`` file.  The list of
 attributes below are separated into application independent attributes
 and at this time additional attributes required by CESM. There are no
 UFS-specific attributes required by the UFS application.
@@ -20,9 +20,9 @@ General
 **coupling_mode** (required)
 
   The coupling_mode attribute determines which
-  ``esmFlds_exchange_xxx_mod.F90`` and ``fd_xxx.yaml`` is used by
-  CMEPS and is also leveraged in some of the custom calculations in
-  the ``prep`` modules.
+  ``esmFlds_exchange_xxx_mod.F90`` is used by CMEPS and is also
+  leveraged in some of the custom calculations in the ``prep``
+  modules.
 
   The currently supported values for ``coupling_mode`` are ``cesm``, ``noresm``, ``ufs.(frac,nfrac).(aoflux)``, and ``hafs``.
 

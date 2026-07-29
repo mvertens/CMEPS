@@ -5,9 +5,9 @@ Fields and the field dictionary
 ===============================
 
 Components are connected by matching **standard field names**, not by position
-or order (see :ref:`concepts`). This page describes, for CESM/NorESM, the
-**field dictionary** that defines those names, the **naming convention** they
-follow, and where field names show up when you configure or debug a run.
+or order (see :ref:`concepts`). This page describes the **field dictionary**
+that defines those names, the **naming convention** they follow, and where field
+names show up when you configure or debug a run.
 
 The field dictionary
 ====================
@@ -39,9 +39,13 @@ is what guarantees both sides agree on the name and the units.
 
 .. note::
 
-   Each host application has its own field dictionary. CESM/NorESM use
-   ``fd_cesm.yaml``; **UFS** uses ``fd_ufs.yaml``. Which dictionary is used is
-   determined by the ``coupling_mode`` attribute (see :ref:`run-config`).
+   Each host application has its own field dictionary, and they are **not
+   provided the same way**:
+
+   * For **CESM/NorESM**, the dictionary is ``fd_cesm.yaml`` and it **ships with
+     the CMEPS code** (``mediator/fd_cesm.yaml``).
+   * For **UFS**, the dictionary is ``fd_ufs.yaml`` and it is **not** part of the
+     CMEPS code — it is provided by the UFS application.
 
 The naming convention
 =====================

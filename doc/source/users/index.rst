@@ -6,33 +6,31 @@ User Guide
 
 .. important::
 
-   **This User Guide is specific to CESM and NorESM.** Because the driver, the
-   run-configuration file, and the case-control tooling are host-specific (see
-   :ref:`run-sequence`), the operational guidance here — how a run is
-   configured and driven — applies to the CESM/NorESM applications. Users of
-   other applications such as **UFS** or **HAFS** should consult that
-   application's own user documentation for the equivalent workflow.
+   **The driver, the run-configuration file, and the run sequence file are
+   host-specific.** Where applicable, differences between CESM/NorESM and UFS
+   are called out in host-specific sections.
 
    The mediator itself is shared across applications, so the :ref:`Overview
-   <overview>` and :ref:`Developer Guide <developer>` are not host-specific —
-   only this User Guide is.
+   <overview>` and :ref:`Developer Guide <developer>` are not host-specific.
 
 A coupled run is driven by **two key inputs that the NUOPC driver ingests** at
 start-up:
 
 * the **run sequence** — the ordered recipe of component runs, mediator phases
   and field transfers, together with the coupling intervals (:ref:`run-sequence`); and
-* the **run configuration** — the ESMF attributes the driver reads at initialization and shares
-  with the mediator and other model components.
+* the **run configuration** — the ESMF attributes the driver reads at
+  initialization and makes available to the mediator and the other components
   (:ref:`run-config`).
 
-The pages below describe each of these two inputs in turn, and then show how a
-CESM/NorESM case is configured to produce them.
+The pages below describe each of these two inputs in turn, and then show how
+CESM/NorESM and UFS cases are configured to produce them.
 
 .. toctree::
    :maxdepth: 2
 
    run_sequence
    runconfig
+   runconfig_ufs
    running
+   running_ufs
    fields

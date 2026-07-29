@@ -1,16 +1,17 @@
 .. _running-a-case:
 
-==============================
-Configuring and running a case
-==============================
+============================================
+Configuring and running a case (CESM/NorESM)
+============================================
 
 .. note::
 
-   This page is specific to **CESM and NorESM**, which use the CIME
-   case-control system. It describes only the parts of the workflow that affect
-   the CMEPS mediator; for the general CIME workflow
-   (``create_newcase``, ``case.setup``, ``case.build``, ``case.submit``) refer
-   to the CIME project at https://github.com/ESMCI/cime.
+   This page describes the **CESM/NorESM** workflow, which uses the CIME
+   case-control system. It covers only the parts that affect the CMEPS mediator;
+   for the general CIME workflow (``create_newcase``, ``case.setup``,
+   ``case.build``, ``case.submit``) refer to the CIME project at
+   https://github.com/ESMCI/cime. The UFS workflow is covered separately in
+   :ref:`Configuring and running a case (UFS) <running-a-case-ufs>`.
 
 From a CMEPS point of view, two kinds of configuration matter: the **coupling
 intervals** (which shape the :ref:`run sequence <run-sequence>`) and the
