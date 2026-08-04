@@ -67,6 +67,16 @@ A worked example
 The run sequence below is from a NorESM run and couples atmosphere, land, sea ice, ocean, river and
 land-ice at several different intervals. Read it from the outermost loop inward.
 
+.. figure:: ../run_sequence_loops.png
+   :width: 100%
+   :alt: Nested coupling-interval loops of a CMEPS run sequence
+
+   The nested coupling-interval loops of the example below. Each ``@<dt>`` opens
+   a time loop at that interval, and the loops nest: components in the outer
+   loops are coupled less frequently than those in the inner loops. The dashed
+   ``@@3600`` block runs once per hour *inside* the 30-minute fast loop, where it
+   averages the accumulated ocean forcing before sending it to the ocean.
+
 .. code-block:: none
 
    runSeq::

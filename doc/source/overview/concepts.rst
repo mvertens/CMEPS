@@ -30,6 +30,11 @@ between them, and it runs the coupled time loop — invoking each component's ru
 phase, each mediator phase, and each field transfer in the order given by the
 **run sequence**.
 
+Crucially, the driver does **no science of its own** — it computes no physical
+fields. Its role is purely **control flow and timekeeping**: creating the
+components and connectors, advancing the clock, and invoking each run phase in
+the prescribed order.
+
 Whenever this documentation refers to "the driver," it means this host-specific
 harness that assembles and steps a particular application — not the mediator.
 The distinction between the shared mediator and the host-specific driver is
@@ -58,12 +63,6 @@ is done by changing the run sequence.
    * The driver that ingests the run sequence is host-specific. The driver under
      ``cesm/`` in this repository is used only by **CESM and NorESM**; **UFS**
      uses its own driver.
-   * How the run sequence is *generated* is host-specific. For CESM/NorESM it is
-     produced by the CIME case-control system from the coupling intervals you
-     configure (the generator lives in ``cime_config/runseq/`` and is
-     CIME-only); UFS assembles its run sequence by other means.
-   * The run configuration the driver ingests is host-specific:
-     ``nuopc.runconfig`` for CESM/NorESM, ``ufs.configure`` for UFS.
 
    **The mediator (CMEPS) — shared across applications:**
 
@@ -79,8 +78,24 @@ is done by changing the run sequence.
      applications.
 
 The run sequence itself is written in a **common NUOPC format** that is the same
-whichever application's driver ingests it. For how it is generated and stored on
-CESM/NorESM, see the :ref:`User Guide <run-sequence>`.
+whichever application's driver ingests it. 
+
+.. note::
+
+   **A common misconception: the mediator is not "driving" the run.** A run
+   sequence usually contains many ``MED`` phases — mapping, merging, the
+   atmosphere/ocean flux calculation, accumulation, and so on — so it is easy to
+   look at it and conclude that the mediator is orchestrating the coupled system.
+   It is not. Each ``MED`` line is simply **the driver calling a mediator phase**
+   at the point the run sequence specifies. The driver owns the time loop and
+   decides what runs, in what order, and how often; the mediator only *provides*
+   phases and executes them when it is called. The mediator never advances the
+   clock, never chooses the order, and never invokes another component — that is
+   entirely the driver's job. Put simply: the **driver is the conductor**,
+   deciding who plays when, while the **mediator is the translator and combiner**
+   that receives fields from each component, reshapes them (regridding, merging,
+   unit conversion) and passes them on. The mediator is a *participant* in the
+   run sequence, not its conductor.
 
 The run configuration
 ---------------------
@@ -100,13 +115,10 @@ The relationship to the mediator mirrors that of the run sequence:
   queries the attributes it needs (for example the coupling mode, the grid on
   which atmosphere/ocean fluxes are computed, or whether budget diagnostics are
   enabled, etc.).
-* The run-configuration **file is host-specific**: ``nuopc.runconfig`` for
-  CESM/NorESM, ``ufs.configure`` for UFS. Because the mediator depends only on
-  the *attributes*, not on the file that supplied them, the same mediator code
-  works for every host.
-
-For the CESM/NorESM run configuration and the specific attributes the mediator
-reads, see the :ref:`User Guide <run-config>`.
+* The run-configuration **file is host-specific** and is read by the
+  driver. Because the mediator depends only on the *attributes*, not
+  on the file that supplied them, the same mediator code works for
+  every host.
 
 The mediator
 ============
