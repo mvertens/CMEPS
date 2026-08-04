@@ -67,8 +67,8 @@ is done by changing the run sequence.
 
    **The mediator (CMEPS) — shared across applications:**
 
-   * The mediator is shared across applications such as **NorESM** and **UFS**;
-     the same mediator code serves them all.
+   * The mediator is shared across applications such as **CESM**, **NorESM** and
+     **UFS**; the same mediator code serves them all.
    * The mediator does not parse the run sequence; it simply registers the
      ``MED`` phases that the run sequence names.
    * The mediator obtains only the *attributes* the driver sets from the run
@@ -163,26 +163,83 @@ Nearly everything the mediator does is built from three operations:
 Mapping (interpolation)
    Moving a field from a source grid to a destination grid using precomputed
    ESMF *routehandles* (sparse-matrix weights). Weights can be conservative,
-   bilinear, nearest-neighbor and so on. Mapping is the subject of the
-   Developer Guide's mapping page.
+   bilinear, nearest-neighbor and so on. See the :ref:`mapping <mapping>` page
+   in the Developer Guide.
 
 Merging
    Combining several mapped source fields into one destination field — for
    example forming the field the atmosphere sees over a grid cell that is part
    land, part ocean and part sea ice. Merges are weighted by **surface
-   fractions**.
+   fractions**. See the :ref:`merging <merging>` page in the Developer Guide.
 
 Time averaging and accumulation
    Reconciling components coupled at different frequencies by accumulating a
    field over the fast-coupling periods and averaging it before it is passed to
-   a component running on a slower coupling period.
+   a component running on a slower coupling period. Accumulation and averaging
+   are developed on the :ref:`conservation <conservation>` page in the Developer
+   Guide.
+
+Surface fractions
+-----------------
+
+Because a single atmosphere/land grid cell can overlap land, ocean and sea ice,
+the mediator tracks the **fraction** of each surface type in every cell. For a
+given atmosphere cell the land, ocean and ice fractions sum to one:
+
+.. math::
+
+   f_{al} + f_{ao} + f_{ai} = 1
+
+Fractions are dynamic (the ice fraction changes as sea ice grows and melts) and
+are themselves mapped between grids. They appear as weights in essentially
+every merge, which is why a dedicated module maintains them. See the
+:ref:`fractions <surface-fractions>` page in the Developer Guide for details.
+
+Conservation
+------------
+
+A guiding requirement of the mediator is **conservation** of mass and energy:
+a flux leaving one component must deposit the same integrated quantity in the
+component that receives it, even after mapping and merging across mismatched
+grids.
+
+CMEPS's mapping weights are **pure area-overlap weights** — static geometry,
+computed once and summing to one. Masking and normalization are deliberately
+*not* folded into them, because those are **dynamic**: they use the ocean/ice
+surface fraction, which changes in time as sea ice grows and melts, and a
+time-varying fraction cannot be precomputed into static weights. So masking and
+normalization are applied **at run time, when a field is mapped or merged**,
+using the surface fractions — which enter in two distinct places:
+
+* **Mapping** a field that covers only part of a cell — for example a
+  sea-surface temperature, defined only where there is ocean — fraction-weights
+  the field before mapping and normalizes by the mapped fraction, so undefined
+  land values are not pulled in and the integral is preserved.
+* **Merging** the land, ocean and ice contributions into the single field the
+  atmosphere sees weights each surface by its fraction
+  (``Fa = fal*Fal + fao*Fao + fai*Fai``).
+
+These two fraction weightings look redundant, and in fact partly cancel; the
+full derivation — why fraction-weighted normalized mapping conserves, how area
+corrections are applied to fluxes, and how accumulation interacts with mapping —
+is summarized in the :ref:`conservation <conservation>` page of the Developer
+Guide. It is important background for anyone changing how fields are coupled, but
+not required to run a coupled case.
+
+.. note::
+
+   Two rules of thumb that recur in the conservation discussion:
+
+   * Accumulate the **fraction-weighted flux** (``f*F``), never the fraction
+     and flux separately — ``sum(f*F)`` is not ``sum(f)*sum(F)``.
+   * Area corrections apply to **fluxes only**, are computed once at
+     initialization, and do not vary in time.
 
 Beyond these three operations, the mediator also **computes** certain fields
 itself rather than merely transferring them between components. These are not
 simple map/merge/average steps; each is described in its own section below
-(atmosphere/ocean fluxes, ocean albedos, land-to-land-ice downscaling, and
-surface fractions) and developed further in the :ref:`Developer Guide
-<developer>`.
+(atmosphere/ocean fluxes, ocean albedos and land-to-land-ice downscaling) and
+developed further in the :ref:`Developer Guide <developer>`.
 
 Atmosphere/ocean fluxes
 -----------------------
@@ -215,7 +272,7 @@ Computing the fluxes in one place, from a consistent set of states, keeps the
 atmosphere and ocean seeing the same interface and makes conservation
 tractable: the resulting fluxes are fraction-weighted, mapped conservatively
 between grids, and merged with the ice/ocean fluxes so that each component
-receives a consistent flux (see the discussion of **Conservation** below).
+receives a consistent flux (see the discussion of **Conservation** above).
 
 The fluxes are delivered to the two components on their own grids and at their
 own coupling intervals: to the **atmosphere on the atmosphere grid at the
@@ -241,7 +298,8 @@ Two aspects are configurable:
    host-specific location: under ``cesm/`` (``cesm/flux_atmocn``) for CESM/NorESM
    and under ``ufs/`` (``ufs/flux_atmocn_mod.F90``, with a CCPP variant) for UFS.
    The mediator phase that drives it, ``med_phases_aofluxes``, is common; the
-   full treatment is in the :ref:`Developer Guide <developer>`.
+   full treatment is on the :ref:`atmosphere/ocean fluxes <aofluxes>` page of the
+   Developer Guide.
 
 Ocean albedos
 -------------
@@ -257,7 +315,8 @@ shortwave bands and the two illumination types:
 
 These ocean albedos are then merged with the corresponding albedos obtained from
 the land and from the sea ice, and the merged albedos are sent to the atmosphere
-for its shortwave radiation calculation.
+for its shortwave radiation calculation. See the :ref:`ocean albedos
+<ocean-albedo>` page in the Developer Guide.
 
 Land to land-ice downscaling
 ----------------------------
@@ -269,46 +328,3 @@ them from the land's elevation-class representation onto the land-ice grid,
 using each land-ice cell's actual elevation to select and interpolate the
 appropriate value. This is a vertical remapping driven by elevation, not a plain
 horizontal interpolation.
-
-Surface fractions
------------------
-
-Because a single atmosphere/land grid cell can overlap land, ocean and sea ice,
-the mediator tracks the **fraction** of each surface type in every cell. For a
-given atmosphere cell the land, ocean and ice fractions sum to one:
-
-.. math::
-
-   f_{al} + f_{ao} + f_{ai} = 1
-
-Fractions are dynamic (the ice fraction changes as sea ice grows and melts) and
-are themselves mapped between grids. They appear as weights in essentially
-every merge, which is why a dedicated module maintains them. See the Developer
-Guide's fractions page for details.
-
-Conservation
-------------
-
-A guiding requirement of the mediator is **conservation** of mass and energy:
-a flux leaving one component must deposit the same integrated quantity in the
-component that receives it, even after mapping and merging across mismatched
-grids. Achieving this ties together several details that must be considered
-together — mapping weights, masks, normalization, fraction weighting, and
-model-vs-ESMF *area corrections*. CMEPS uses unmasked, unnormalized
-conservative weights and then maps with a **fraction-weighted, normalized**
-approach, with merges carried out using fraction weights.
-
-The full derivation — including why fraction-weighted normalized mapping
-conserves, how area corrections are applied to fluxes, and how accumulation
-interacts with mapping — is developed in the Developer Guide. It is important
-background for anyone changing how fields are coupled, but not required to run
-a coupled case.
-
-.. note::
-
-   Two rules of thumb that recur in the conservation discussion:
-
-   * Accumulate the **fraction-weighted flux** (``f*F``), never the fraction
-     and flux separately — ``sum(f*F)`` is not ``sum(f)*sum(F)``.
-   * Area corrections apply to **fluxes only**, are computed once at
-     initialization, and do not vary in time.

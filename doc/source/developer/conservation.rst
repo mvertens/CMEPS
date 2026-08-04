@@ -11,17 +11,64 @@ grids and averaged over mismatched coupling intervals. Achieving this ties
 together several details that must be considered *together* — mapping weights,
 surface fractions, normalization, model-versus-ESMF areas, and accumulation.
 
-CMEPS uses **unmasked, unnormalized conservative weights**, maps with a
-**fraction-weighted, normalized** approach, and carries out merges with
-**fraction weights**. This page develops why that combination conserves; it is
-the principle that the :ref:`mapping`, :ref:`merging` and
-:ref:`fractions <surface-fractions>` pages that follow then implement, and it
-expands the conservation summary in :ref:`concepts`.
+CMEPS's mapping weights are **pure area-overlap weights**: each is the
+fractional area a source cell contributes to a destination cell. Masking and
+normalization are deliberately **not** folded into them. The reason is a split
+between the static and the dynamic:
+
+* the **weights are static geometry** — area overlaps between cells, computed
+  once and reused every coupling step, and summing to one; whereas
+* the **masking and normalization are dynamic** — they are done with the
+  ocean/ice **surface fraction**, which changes in time as sea ice grows and
+  melts (the ocean fraction is ``1 - ice fraction``).
+
+A time-varying fraction cannot be precomputed into static weights, so it is
+applied **at run time, every coupling step, when a field is mapped or merged**: a
+partial-coverage field is fraction-weighted and normalized when mapped, and the
+surface contributions are fraction-weighted when merged. (ESMF could fold a
+*static* land/ocean mask into the weights, but that static mask cannot represent
+the dynamic ice coverage that conservation depends on, and folding normalization
+in would break the sum-to-one property besides.)
+
+This page develops why that combination conserves; it is the principle that the
+:ref:`mapping`, :ref:`merging` and :ref:`fractions <surface-fractions>` pages
+that follow then implement, and it expands the conservation summary in
+:ref:`concepts`.
 
 The example below uses a single atmosphere cell ``a`` that overlaps four
 ocean/ice cells ``1..4``; ``A`` is an overlap area, ``w`` a mapping weight, ``f``
 a surface fraction, ``F`` a field, and subscripts ``l/o/i`` denote land, ocean
 and ice.
+
+The figures below make this setup concrete. In the most common CMEPS
+configuration the ocean and sea-ice grids are identical, as are the atmosphere
+and land grids, and the ocean/ice grid carries the mask that distinguishes
+ocean/ice cells from land.
+
+.. figure:: ../CMEPS-grid1.png
+   :width: 400px
+   :alt: Overlapping atmosphere and ocean/ice grids
+
+   Overlapping atmosphere and ocean/ice grids. Interpolating the ocean/ice mask
+   onto the atmosphere/land grid sets the complementary land and ocean/ice masks
+   there; the land model may make a single atmosphere cell part land, part ocean
+   and part sea ice.
+
+.. figure:: ../CMEPS-grid2.png
+   :width: 400px
+   :alt: A single atmosphere cell overlapping several ocean/ice cells
+
+   Focusing on a single atmosphere cell ``a`` and the ocean/ice cells ``1..4``
+   it overlaps.
+
+.. figure:: ../CMEPS-grid3.png
+   :width: 300px
+   :alt: Naming convention for the atmosphere cell and its ocean/ice overlaps
+
+   The labeling used throughout this page. Each overlap ``i`` has an area ``Ai``
+   and a mask ``Mi`` (land green, ocean blue, sea ice white). On the atmosphere
+   cell the land, ocean and ice fractions satisfy ``fal + fao + fai = 1``, and
+   ``Fa`` is the merged gridcell-average field.
 
 Conservative mapping weights
 ============================
