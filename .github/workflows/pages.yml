@@ -7,8 +7,7 @@ name: docs-pages
 on:
   push:
     branches:
-      - main
-      - feature/new_documentation
+      - noresm
     paths:
       - 'doc/**'
       - '.github/workflows/pages.yml'
