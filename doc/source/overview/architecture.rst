@@ -85,7 +85,9 @@ exchanged and *how* they are mapped and merged for a given host:
 
   * ``med_phases_ocnalb_mod.F90``
 
-* Inline CDEPS functionality.
+* Inline CDEPS functionality. This is used to fill unmapped regions
+  that can arise in regional coupled configurations due to domain
+  mismatch (i.e. between atmosphere-ocean)
 
   * ``med_phases_cdeps_mod.F90``
 
@@ -136,8 +138,8 @@ Within a single coupling interval, a typical sequence looks like:
 #. A ``post_<comp>`` phase ingests the fields the mediator has just imported
    from that component (mapping as needed).
 #. The mediator updates the surface fractions.
-#. The mediator computes atmosphere/ocean fluxes and ocean albedos where it is
-   responsible for them.
+#. Optionally, the mediator can compute atmosphere/ocean fluxes and ocean albedos, depending
+   on the component configuration.
 #. A ``prep_<comp>`` phase maps and merges the required sources into the fields
    the mediator exports to each destination component, accumulating and
    averaging across coupling intervals as required.

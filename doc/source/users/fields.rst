@@ -29,7 +29,7 @@ Each entry has:
 * **standard_name** — the short name used throughout CMEPS to make connections
   (for example ``Faox_evap``).
 * **alias** — an optional longer, self-describing NUOPC-style name
-  (``mean_evap_rate_atm_into_ocn``).
+  (``mean_evap_rate_atm_into_ocn``). Note that a given ``standard_name`` can have multiple aliases.
 * **canonical_units** — the units the field is expected in.
 * **description** — an optional human-readable description.
 

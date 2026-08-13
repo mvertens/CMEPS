@@ -72,7 +72,7 @@ During its initialization phases the mediator retrieves attributes with
 and set, so optional attributes can fall back to defaults. The attributes CMEPS
 consumes fall into a few groups:
 
-* **Coupling mode** — ``coupling_mode`` selects which host exchange logic
+* **Coupling mode** — ``coupling_mode`` selects which field exchange specification file is chosen 
   (``esmFldsExchange_<host>_mod.F90``) and which custom ``prep`` calculations
   are used.
 * **Atmosphere/ocean flux options** — for example ``aoflux_grid`` (the grid on

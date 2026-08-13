@@ -105,8 +105,8 @@ start-up (the run sequence being the first). Whereas the run sequence says *what
 runs, in what order, and how often*, the run configuration supplies the
 **attributes** that the driver and each component, including the mediator, can
 query at run time in order to configure their target behavior.
-For the driver this includes what the list such attributes as the list of active components
-and the processor layout. 
+For the driver, these attributes include the list of active components and the
+processor layout.
 
 The relationship to the mediator mirrors that of the run sequence:
 
@@ -123,26 +123,27 @@ The relationship to the mediator mirrors that of the run sequence:
 The mediator
 ============
 
-The mediator supplies the coupling machinery. The remaining concepts below —
-how components exchange fields with it, what it does with those fields, and how
-it keeps the coupling conservative — describe that machinery.
+The mediator supplies all of the coupling machinery and in addition
+also computes atmosphere/ocean fluxes and ocean albedoes where
+appropriate. The following is a high level overview of the mediator functionality.
+
 
 Import and export states
 ------------------------
 
 Components and the mediator communicate through two ESMF states:
 
-* an **import state**, holding fields flowing *into* the owner, and
-* an **export state**, holding fields flowing *out of* the owner.
+* an ESMF **import state**, holding fields flowing *into* a component, and
+* an ESMF **export state**, holding fields flowing *out of* a component
 
-A state wraps native model data as ESMF fields and carries metadata: the
-standard field names, the grid or mesh and its coordinates, and the parallel
-decomposition. 
+An ESMF state wraps native model data as ESMF fields and additionally
+also carries metadata: the standard field names, the grid or mesh and
+its coordinates, and the parallel decomposition.
 
 .. important::
 
-   **States are named from the owner's point of view, so the mediator sees them
-   reversed relative to a component.** A field a component sends *out* lives in
+   **States are named from the component's point of view, so the mediator sees them
+   reversed relative to a model component (e.g. atmosphere). ** A field a component sends *out* lives in
    that component's **export** state — but the mediator *receives* it, so from
    the mediator's point of view it arrives in the mediator's **import** state.
    Likewise, a field the mediator sends to a component lives in the mediator's
@@ -163,7 +164,9 @@ Fields and the field dictionary
 
 Connections between components are made by matching **standard field names**
 rather than by position or order. The full set of names, together with their
-long names, units and metadata, is the **field dictionary**. CMEPS ships a
+long names, units and metadata, is the `field dictionary
+<https://earthsystemmodeling.org/docs/release/ESMF_8_4_2/NUOPC_refdoc/node3.html#SECTION00032000000000000000>`_.
+CMEPS ships a
 field dictionary per host application. Adding a new coupled field therefore
 starts with the dictionary; this is covered in the Developer Guide.
 
