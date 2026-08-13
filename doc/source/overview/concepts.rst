@@ -141,13 +141,14 @@ the parallel decomposition.
 
 .. important::
 
-   **States are named from the component's point of view, so the mediator sees
-   them reversed relative to a model component such as the atmosphere.** A field
-   a component sends *out* lives in
-   that component's **export** state — but the mediator *receives* it, so from
-   the mediator's point of view it arrives in the mediator's **import** state.
-   Likewise, a field the mediator sends to a component lives in the mediator's
-   **export** state, and the component receives it into its **import** state.
+   **States are named from the component's point of view, so the
+   mediator sees them reversed relative to a model component such as
+   the atmosphere.** A component **sends out** fields in it's
+   **export** state - and the mediator *receives* it, so from the
+   mediator's point of view it arrives in the mediator's **import**
+   state.  Likewise, a field the mediator sends to a component lives
+   in the mediator's **export** state, and the component receives it
+   into its **import** state.
 
    In short:
 
