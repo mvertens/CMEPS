@@ -17,9 +17,9 @@ to the mediator by a NUOPC **cap**, a small software layer that translates
 between the component's native data and the ESMF states the mediator
 understands.
 
-Although CMEPS can be considered to be an ESMF component shared among
-host models - it does not have a NUOPC cap. All data structures in
-CMEPS are ESMF/NUOPC compliant.
+Unlike a model component, CMEPS (the mediator) has no NUOPC cap of its own —
+its data structures are already ESMF/NUOPC-compliant, so no translation layer
+is needed.
 
 The driver
 ==========
@@ -36,9 +36,8 @@ components and connectors, advancing the clock, and invoking each run phase in
 the prescribed order.
 
 Whenever this documentation refers to "the driver," it means this host-specific
-harness that assembles and steps a particular application — not the mediator.
-The distinction between the shared mediator and the host-specific driver is
-spelled out under **The run sequence** below.
+harness — not the mediator; the two are distinguished under **The run sequence**
+below.
 
 The run sequence
 ----------------
@@ -78,7 +77,7 @@ is done by changing the run sequence.
      applications.
 
 The run sequence itself is written in a **common NUOPC format** that is the same
-whichever application's driver ingests it. 
+whichever application's driver ingests it.
 
 .. note::
 
@@ -123,9 +122,9 @@ The relationship to the mediator mirrors that of the run sequence:
 The mediator
 ============
 
-The mediator supplies all of the coupling machinery and in addition
-also computes atmosphere/ocean fluxes and ocean albedoes where
-appropriate. The following is a high level overview of the mediator functionality.
+The mediator supplies all of the coupling machinery and also computes
+atmosphere/ocean fluxes and ocean albedos where appropriate. The following is a
+high level overview of the mediator functionality.
 
 
 Import and export states
@@ -136,18 +135,20 @@ Components and the mediator communicate through two ESMF states:
 * an ESMF **import state**, holding fields flowing *into* a component, and
 * an ESMF **export state**, holding fields flowing *out of* a component
 
-An ESMF state wraps native model data as ESMF fields and additionally
-also carries metadata: the standard field names, the grid or mesh and
-its coordinates, and the parallel decomposition.
+An ESMF state wraps native model data as ESMF fields and also carries
+metadata: the standard field names, the grid or mesh and its coordinates, and
+the parallel decomposition.
 
 .. important::
 
-   **States are named from the component's point of view, so the mediator sees them
-   reversed relative to a model component (e.g. atmosphere). ** A field a component sends *out* lives in
-   that component's **export** state — but the mediator *receives* it, so from
-   the mediator's point of view it arrives in the mediator's **import** state.
-   Likewise, a field the mediator sends to a component lives in the mediator's
-   **export** state, and the component receives it into its **import** state.
+   **States are named from the component's point of view, so the
+   mediator sees them reversed relative to a model component such as
+   the atmosphere.** A component **sends out** fields in it's
+   **export** state - and the mediator *receives* it, so from the
+   mediator's point of view it arrives in the mediator's **import**
+   state.  Likewise, a field the mediator sends to a component lives
+   in the mediator's **export** state, and the component receives it
+   into its **import** state.
 
    In short:
 
