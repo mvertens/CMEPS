@@ -5,7 +5,6 @@ module med_phases_history_mod
   !-----------------------------------------------------------------------------
 
   use med_kind_mod          , only : CX=>SHR_KIND_CX, CS=>SHR_KIND_CS, CL=>SHR_KIND_CL, R8=>SHR_KIND_R8
-  use med_kind_mod          , only : CXX=>SHR_KIND_CXX
   use ESMF                  , only : ESMF_GridComp, ESMF_GridCompGet, ESMF_VM
   use ESMF                  , only : ESMF_Clock, ESMF_ClockGet, ESMF_ClockSet, ESMF_ClockAdvance
   use ESMF                  , only : ESMF_ClockGetNextTime, ESMF_ClockGetAlarm, ESMF_ClockIsCreated
@@ -14,12 +13,12 @@ module med_phases_history_mod
   use ESMF                  , only : ESMF_Alarm, ESMF_AlarmIsRinging, ESMF_AlarmRingerOff, ESMF_AlarmGet
   use ESMF                  , only : ESMF_FieldBundle, ESMF_FieldBundleGet
   use ESMF                  , only : ESMF_LogWrite, ESMF_LOGMSG_INFO
-  use ESMF                  , only : ESMF_SUCCESS, ESMF_MAXSTR, ESMF_LOGERR_PASSTHRU
+  use ESMF                  , only : ESMF_SUCCESS
   use ESMF                  , only : operator(-), operator(+)
   use NUOPC                 , only : NUOPC_CompAttributeGet
   use NUOPC_Model           , only : NUOPC_ModelGet
   use med_utils_mod         , only : chkerr => med_utils_ChkErr
-  use med_internalstate_mod , only : ncomps, compname, compocn, complnd, compglc
+  use med_internalstate_mod , only : ncomps, compname
   use med_internalstate_mod , only : InternalState, maintask, logunit
   use med_io_mod            , only : med_io_write, med_io_wopen, med_io_enddef, med_io_close
   use med_field_info_mod    , only : med_field_info_type, med_field_info_array_from_state
@@ -544,7 +543,7 @@ contains
 
     ! Write yearly average of lnd -> glc fields on both land and glc grids
 
-    use med_internalstate_mod , only : compglc
+    use med_internalstate_mod , only : compglc, complnd, compocn
     use med_constants_mod     , only : SecPerDay => med_constants_SecPerDay
     use med_io_mod            , only : med_io_write_time, med_io_define_time
     use med_io_mod            , only : med_io_date2yyyymmdd, med_io_sec2hms, med_io_ymd2date
