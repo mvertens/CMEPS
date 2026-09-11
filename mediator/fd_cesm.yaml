@@ -1414,19 +1414,11 @@
        description: Daily averaged mean wave period of the first moment (only needed for mediator history output)
      #
      - standard_name: Sw_thm_avg
-<<<<<<< HEAD
-       canonical_units: degrees
-       description: Daily averaged mean wave direction (only needed for mediator history output)
-     #
-     - standard_name: Sw_thp0_avg
-       canonical_units: degrees
-=======
        canonical_units: radians
        description: Daily averaged mean wave direction (only needed for mediator history output)
      #
      - standard_name: Sw_thp0_avg
        canonical_units: radians
->>>>>>> main
        description: Daily averaged peak wave direction (only needed for mediator history output)
      #
      - standard_name: Sw_fp0_avg
