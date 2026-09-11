@@ -944,7 +944,8 @@
       1 : Taylor et al. (1996)
     </desc>
     <values>
-      <value>1</value>
+      <value coupling_mode="noresm">1</value>
+      <value coupling_mode="cesm">0</value>
     </values>
   </entry>
 
