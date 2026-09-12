@@ -54,17 +54,6 @@
     </values>
   </entry>
 
-  <entry id="cime_model" modify_via_xml="CIME_MODEL">
-    <type>char</type>
-    <category>expdef</category>
-    <group>DRIVER_attributes</group>
-    <valid_values>cesm</valid_values>
-    <desc>cime model</desc>
-    <values>
-      <value>cesm</value>
-    </values>
-  </entry>
-
   <entry id="timing_dir">
     <type>char</type>
     <category>expdef</category>
@@ -342,14 +331,6 @@
   <!-- ALLCOMP general attributes                  -->
   <!-- =========================================== -->
 
-  <entry id="MED_model">
-    <type>char</type>
-    <category>nuopc</category>
-    <group>ALLCOMP_attributes</group>
-    <values>
-      <value cime_model="cesm">cesm</value>
-    </values>
-  </entry>
   <entry id="mesh_mask" modify_via_xml="MASK_MESH">
     <type>char</type>
     <category>mapping</category>

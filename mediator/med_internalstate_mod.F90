@@ -37,7 +37,6 @@ module med_internalstate_mod
   character(len=CS), public, allocatable :: compname(:)
 
   ! Specific component name (e.g. datm, mom6, etc...)
-  character(len=CS), public :: med_name = ''
   character(len=CS), public :: atm_name = ''
   character(len=CS), public :: lnd_name = ''
   character(len=CS), public :: ocn_name = ''
@@ -357,8 +356,6 @@ contains
     if (isPresent .and. isSet) then
        read(cvalue,*) is_local%wrap%comp_present(compmed)
     end if
-    call NUOPC_CompAttributeGet(gcomp, name='MED_model', value=med_name, isPresent=isPresent, isSet=isSet, rc=rc)
-    if (ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call NUOPC_CompAttributeGet(gcomp, name='ATM_model', value=atm_name, isPresent=isPresent, isSet=isSet, rc=rc)
     if (ChkErr(rc,__LINE__,u_FILE_u)) return
@@ -444,7 +441,6 @@ contains
        if (is_local%wrap%comp_present(compice)) write(logunit,'(a)') trim(subname) // " ice model= "//trim(ice_name)
        if (is_local%wrap%comp_present(comprof)) write(logunit,'(a)') trim(subname) // " rof model= "//trim(rof_name)
        if (is_local%wrap%comp_present(compwav)) write(logunit,'(a)') trim(subname) // " wav model= "//trim(wav_name)
-       if (is_local%wrap%comp_present(compmed)) write(logunit,'(a)') trim(subname) // " med model= "//trim(med_name)
        if (is_local%wrap%num_icesheets > 0) then
           if (is_local%wrap%comp_present(compglc(1))) write(logunit,'(a)') trim(subname) // " glc model= "//trim(glc_name)
        end if
