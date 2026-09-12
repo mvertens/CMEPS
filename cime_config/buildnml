@@ -279,15 +279,14 @@ def _create_drv_namelists(case, infile, confdir, nmlgen, files):
     if 'atm' in component_computes_enthalpy_flux:
         nmlgen.set_value("budget_table_version", value="v2")
         expect(
-            case.get_value("COMP_ATM") != "cam" and
-            case.get_value("COMP_OCN") == "mom6",
-            "Only CAM and BLOM are currently allowed if cam computes enthalpy fluxes"
+            case.get_value("COMP_ATM") == "cam" and
+            case.get_value("COMP_OCN") == "blom",
+            "Only CAM and BLOM are currently allowed if CAM computes enthalpy fluxes"
             )
     elif component_computes_enthalpy_flux == "med":
             expect(
-            case.get_value("COMP_ATM") != "cam" and
-            case.get_value("COMP_OCN") != "mom6",
-            "Only CAM and MOM6 are currently allowed if mediator computes enthalpy fluxes"
+            case.get_value("COMP_OCN") == "mom",
+            "Only MOM currently supports computing enthalpy fluxes in mediator"
             )
 
     # --------------------------------

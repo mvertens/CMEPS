@@ -678,7 +678,7 @@
     </desc>
     <values>
       <value>none</value>
-      <value comp_ocn="mom6" comp_atm="cam">med</value>
+      <value comp_ocn="mom">med</value>
     </values>
   </entry>
 
