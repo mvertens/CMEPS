@@ -30,8 +30,8 @@ def _create_drv_namelists(case, infile, confdir, nmlgen, files):
     # Set up config dictionary
     # --------------------------------
     config = {}
-    cime_model = get_model()
-    config["cime_model"] = cime_model
+    # determine coupling mode
+    config["coupling_mode"] = case.get_value("COUPLING_MODE")
     config["iyear"] = case.get_value("COMPSET").split("_")[0]
     config["BGC_MODE"] = case.get_value("CCSM_BGC")
     config["CPL_I2O_PER_CAT"] = case.get_value("CPL_I2O_PER_CAT")
@@ -161,13 +161,9 @@ def _create_drv_namelists(case, infile, confdir, nmlgen, files):
                 "  ./xmlchange DRV_RESTART_POINTER={}".format(expected_pointer),
             )
 
-    # determine coupling mode
-    config["coupling_mode"] = case.get_value("COUPLING_MODE")
-
     # determine wav_ice_coupling
-    if config["coupling_mode"] == "cesm" or config["coupling_mode"] == "noresm":
-        if config['COMP_WAV'] == 'ww3' and config['COMP_ICE'] == 'cice':
-            config["wav_ice_coupling"] = "on"
+    if config['COMP_WAV'] == 'ww3' and config['COMP_ICE'] == 'cice':
+        config["wav_ice_coupling"] = "on"
 
     # determine dms_from_ocn if ocn component is blom
     if config["COMP_OCN"] == "blom":
