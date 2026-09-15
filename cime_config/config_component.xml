@@ -2492,12 +2492,12 @@
    <default_value></default_value>
    <values>
      <value cime_model="cesm">gptl,pio,csm_share,FTorch,CDEPS</value>
+     <value cime_model="noresm">gptl,pio,csm_share,FTorch,CDEPS</value>
    </values>
    <group>build_def</group>
    <file>env_build.xml</file>
    <desc>Support libraries required</desc>
  </entry>
-
 
  <!-- ===================================================================== -->
  <!-- Include the AOFLUX calculation for this compset -->
