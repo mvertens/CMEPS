@@ -40,8 +40,8 @@
     <valid_values>cesm,noresm</valid_values>
     <default_value>cesm</default_value>
     <values>
-      <valid_value cime_model="cesm">cesm</valid_value>
-      <valid_value cime_model="noresm">noresm</valid_value>
+      <value cime_model="cesm">cesm</value>
+      <value cime_model="noresm">noresm</value>
     </values>
     <group>run_coupling</group>
     <file>env_run.xml</file>
@@ -2515,21 +2515,6 @@
    <file>env_run.xml</file>
    <desc>add aoflux calculation to runseq</desc>
  </entry>
-
-  <!-- ===================================================================== -->
-  <!-- TODO: the following should be deleted. They are still used by  -->
-  <!-- the component testing but are not doing anything in cmeps -->
-  <!-- ===================================================================== -->
-
-  <entry id="BFBFLAG">
-    <type>logical</type>
-    <valid_values>TRUE,FALSE</valid_values>
-    <default_value>FALSE</default_value>
-    <group>run_flags</group>
-    <file>env_run.xml</file>
-    <desc>turns on coupler bit-for-bit reproducibility with varying pe counts</desc>
-  </entry>
-
 
  <help>
     =========================================
