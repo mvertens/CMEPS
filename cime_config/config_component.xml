@@ -2489,10 +2489,7 @@
 
  <entry id="CASE_SUPPORT_LIBRARIES">
    <type>char</type>
-   <default_value></default_value>
-   <values>
-     <value cime_model="cesm">gptl,pio,csm_share,FTorch,CDEPS</value>
-   </values>
+   <default_value>gptl,pio,csm_share,FTorch,CDEPS</default_value>
    <group>build_def</group>
    <file>env_build.xml</file>
    <desc>Support libraries required</desc>
