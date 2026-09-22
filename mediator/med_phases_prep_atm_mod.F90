@@ -37,8 +37,8 @@ module med_phases_prep_atm_mod
 
   character(len=CS) :: component_computes_enthalpy_flux = 'unset'
 
-  real(r8) :: global_htot_corr(1) = 0._r8  ! enthalpy correction from med_phases_prep_ocn
-  real(r8) :: global_hrof_corr(1) = 0._r8  ! enthalpy of run-off from med_phases_prep_ocn
+  real(r8) :: global_htot_corr = 0._r8  ! enthalpy correction from med_phases_prep_ocn
+  real(r8) :: global_hrof_corr = 0._r8  ! enthalpy of run-off from med_phases_prep_ocn
 
   character(len=13) :: fldnames_from_ocn(5) = (/'Faoo_fbrf_ocn','Faoo_fdms_ocn','Faoo_fco2_ocn',&
                                                 'Faoo_fn2o_ocn','Faoo_fnh3_ocn'/)
@@ -255,14 +255,14 @@ contains
 
     ! Only do the following correction if the mediator is computing the enthalpy to be sent to the ocean
     ! from rain, snow, etc.
-    ! Note that global_htot_corr(1) is preset to zero as a module variable - and will only be set differently
+    ! Note that global_htot_corr is preset to zero as a module variable - and will only be set differently
     ! if med_phases_prep_atm_enthalpy_correction is called in component_computes_enthalpy_flux == 'med'
     if (trim(component_computes_enthalpy_flux) /= 'med') then
        if ( FB_FldChk(is_local%wrap%FBExp(compatm), 'Faxx_sen' , rc=rc)) then
           call FB_getfldptr(is_local%wrap%FBExp(compatm), 'Faxx_sen', dataptr1, rc=rc)
           if (ChkErr(rc,__LINE__,u_FILE_u)) return
           do n = 1,size(dataptr1)
-             dataptr1(n) = dataptr1(n) + global_htot_corr(1)
+             dataptr1(n) = dataptr1(n) + global_htot_corr
           end do
        end if
     end if
@@ -274,7 +274,7 @@ contains
           call FB_getfldptr(is_local%wrap%FBExp(compatm), 'Faxx_hrof', dataptr1, rc=rc)
           if (ChkErr(rc,__LINE__,u_FILE_u)) return
           do n = 1,size(dataptr1)
-             dataptr1(n) = global_hrof_corr(1)
+             dataptr1(n) = global_hrof_corr
           end do
        end if
     end if
@@ -315,7 +315,7 @@ contains
 
     rc = ESMF_SUCCESS
 
-    call med_global_sums(gcomp, hcorr, global_htot_corr(1), rc)
+    call med_global_sums(gcomp, hcorr, global_htot_corr, rc)
     if (ChkErr(rc,__LINE__,u_FILE_u)) return
 
   end subroutine med_phases_prep_atm_enthalpy_correction
@@ -337,7 +337,7 @@ contains
 
     rc = ESMF_SUCCESS
 
-    call med_global_sums(gcomp, hcorr, global_hrof_corr(1), rc)
+    call med_global_sums(gcomp, hcorr, global_hrof_corr, rc)
     if (ChkErr(rc,__LINE__,u_FILE_u)) return
 
   end subroutine med_phases_prep_atm_enthalpy_runoff

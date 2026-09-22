@@ -136,8 +136,8 @@ contains
     real(r8), pointer     :: Faxa_hmat (:)
     real(r8), pointer     :: Faxa_hlat (:)
     real(r8), allocatable :: hrof2atm(:)
-    real(r8)              :: ocean_htot_corr(1)
-    real(r8)              :: ocean_atot_corr(1)
+    real(r8)              :: ocean_htot_corr
+    real(r8)              :: ocean_atot_corr
     real(r8), allocatable :: hrof(:)
     ! if separate_varlat is true then do global ocean average for
     ! hmat_oa only for the net-mass part, and pass in hmat only local
@@ -380,8 +380,8 @@ contains
 
           ! Set value of Faxa_hmat_oa to ratio of ocean_htot_corr and ocean_atot_corr
           call FB_getfldptr(is_local%wrap%FBExp(compocn), 'Faxa_hmat_oa', dataptr, rc=rc)
-          if (ocean_atot_corr(1) > 0._r8) then
-             dataptr(:) = ocean_htot_corr(1)/ocean_atot_corr(1)
+          if (ocean_atot_corr > 0._r8) then
+             dataptr(:) = ocean_htot_corr/ocean_atot_corr
           end if
 
           !-----------------------
@@ -832,7 +832,7 @@ contains
     ! input/output variables
     type(ESMF_GridComp) , intent(in)  :: gcomp
     real(r8)            , intent(in)  :: local_array(:)
-    real(r8)            , intent(out) :: global_integral(1)
+    real(r8)            , intent(out) :: global_integral
     integer             , intent(out) :: rc
 
     ! local variables
@@ -848,7 +848,7 @@ contains
        local_sum(1) = local_sum(1) + local_array(n)
     end do
 
-    call med_global_sums(gcomp, local_sum, global_integral(1), rc)
+    call med_global_sums(gcomp, local_sum, global_integral, rc)
     if (ChkErr(rc,__LINE__,u_FILE_u)) return
 
   end subroutine med_oa_integral
