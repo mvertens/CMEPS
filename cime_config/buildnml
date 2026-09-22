@@ -43,7 +43,7 @@ def _create_drv_namelists(case, infile, confdir, nmlgen, files):
     config["OS"] = case.get_value("OS")
     config["TESTCASE"] = case.get_value("TESTCASE")
     config["ocn_multilev"] = ".false."
-    config["set_histaux_l2x1yrg"] = ".false."
+    config["compset"] = case.get_value("COMPSET")
     if not config["TESTCASE"]:
         config["TESTCASE"] = "UNSET"
     config["glc_nec"] = (
@@ -54,15 +54,6 @@ def _create_drv_namelists(case, infile, confdir, nmlgen, files):
     config["mask_grid"] = case.get_value("MASK_GRID")
     for val in ("HIST", "REST", "STOP"):
         config[val.lower()+"_option"] = case.get_value(val+"_OPTION")
-
-    config["comp_ocn"] = case.get_value("COMP_OCN")
-
-    config["set_histaux_l2x1yrg"] = (
-        ".true." if case.get_value("COMP_OCN") == 'blom' and case.get_value("COMP_LND") == 'clm' else ".false."
-    )
-    config["ocn_multilev"] = (
-        ".true." if case.get_value("COMP_OCN") == 'blom' or 'DOCN%MULTILEV' in case.get_value("COMPSET") else ".false."
-    )
 
     atm_grid = case.get_value("ATM_GRID")
     lnd_grid = case.get_value("LND_GRID")
@@ -100,7 +91,6 @@ def _create_drv_namelists(case, infile, confdir, nmlgen, files):
     config["samegrid_lnd_rof"] = "true" if lnd_mesh == rof_mesh else "false"
     config["samegrid_wav_ocn"] = "true" if ocn_mesh == wav_mesh else "false"
 
-    # needed for determining the run sequence
     config["COMP_ATM"] = case.get_value("COMP_ATM")
     config["COMP_ICE"] = case.get_value("COMP_ICE")
     config["COMP_GLC"] = case.get_value("COMP_GLC")

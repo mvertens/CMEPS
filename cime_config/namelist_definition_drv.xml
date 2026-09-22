@@ -595,7 +595,8 @@
     </desc>
     <values>
       <value>.false.</value>
-      <value ocn_multilev=".true.">.true.</value>
+      <value COMP_OCN="blom">.true.</value>
+      <value compset="DOCN%MULTILEV">.true.</value>
     </values>
   </entry>
 
@@ -667,7 +668,7 @@
     </desc>
     <values>
       <value>none</value>
-      <value comp_ocn="mom">med</value>
+      <value COMP_OCN="mom">med</value>
     </values>
   </entry>
 
@@ -1022,7 +1023,7 @@
     </desc>
     <values>
       <value>v0</value>
-      <value comp_ocn="mom">v1</value>
+      <value COMP_OCN="mom">v1</value>
     </values>
   </entry>
 
@@ -1905,7 +1906,7 @@
     <desc>Auxiliary mediator lnd2med fields every year</desc>
     <values>
       <value>.false.</value>
-      <value set_histaux_l2x1yrg=".true." >.true.</value>
+      <value COMP_OCN="blom" COMP_LND="clm">.true.</value>
     </values>
   </entry>
 
