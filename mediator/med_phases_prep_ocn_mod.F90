@@ -827,6 +827,8 @@ contains
   !-----------------------------------------------------------------------------
   subroutine med_oa_integral (gcomp, local_array, global_integral, rc)
 
+    use ESMF, only : ESMF_GridComp, ESMF_SUCCESS
+
     ! input/output variables
     type(ESMF_GridComp) , intent(in)  :: gcomp
     real(r8)            , intent(in)  :: local_array(:)
@@ -834,16 +836,11 @@ contains
     integer             , intent(out) :: rc
 
     ! local variables
-    type(InternalState) :: is_local
-    integer             :: n
-    real(r8)            :: local_sum(1)
+    integer  :: n
+    real(r8) :: local_sum(1)
     !---------------------------------------
 
     rc = ESMF_SUCCESS
-
-    nullify(is_local%wrap)
-    call ESMF_GridCompGetInternalState(gcomp, is_local, rc)
-    if (chkErr(rc,__LINE__,u_FILE_u)) return
 
     ! sum contributions to integral
     local_sum(1) = 0._r8

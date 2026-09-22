@@ -311,16 +311,9 @@ contains
     type(ESMF_GridComp) , intent(in)  :: gcomp
     real(r8)            , intent(in)  :: hcorr(:)
     integer             , intent(out) :: rc
-
-    ! local variables
-    type(InternalState) :: is_local
     !---------------------------------------
 
     rc = ESMF_SUCCESS
-
-    nullify(is_local%wrap)
-    call ESMF_GridCompGetInternalState(gcomp, is_local, rc)
-    if (chkErr(rc,__LINE__,u_FILE_u)) return
 
     call med_global_sums(gcomp, hcorr, global_htot_corr(1), rc)
     if (ChkErr(rc,__LINE__,u_FILE_u)) return
@@ -340,16 +333,9 @@ contains
     type(ESMF_GridComp) , intent(in)  :: gcomp
     real(r8)            , intent(in)  :: hcorr(:)
     integer             , intent(out) :: rc
-
-    ! local variables
-    type(InternalState) :: is_local
     !---------------------------------------
 
     rc = ESMF_SUCCESS
-
-    nullify(is_local%wrap)
-    call ESMF_GridCompGetInternalState(gcomp, is_local, rc)
-    if (chkErr(rc,__LINE__,u_FILE_u)) return
 
     call med_global_sums(gcomp, hcorr, global_hrof_corr(1), rc)
     if (ChkErr(rc,__LINE__,u_FILE_u)) return
