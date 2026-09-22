@@ -257,7 +257,7 @@ contains
     ! from rain, snow, etc.
     ! Note that global_htot_corr is preset to zero as a module variable - and will only be set differently
     ! if med_phases_prep_atm_enthalpy_correction is called in component_computes_enthalpy_flux == 'med'
-    if (trim(component_computes_enthalpy_flux) /= 'med') then
+    if (trim(component_computes_enthalpy_flux) == 'med') then
        if ( FB_FldChk(is_local%wrap%FBExp(compatm), 'Faxx_sen' , rc=rc)) then
           call FB_getfldptr(is_local%wrap%FBExp(compatm), 'Faxx_sen', dataptr1, rc=rc)
           if (ChkErr(rc,__LINE__,u_FILE_u)) return
@@ -269,7 +269,7 @@ contains
 
     ! Only do the following if the atmosphere is computing the enthalpy to be sent to the ocean
     ! from rain, snow, etc.
-    if (trim(component_computes_enthalpy_flux) /= 'atm') then
+    if (trim(component_computes_enthalpy_flux) == 'atm') then
        if (FB_FldChk(is_local%wrap%FBExp(compatm), 'Faxx_hrof', rc=rc)) then
           call FB_getfldptr(is_local%wrap%FBExp(compatm), 'Faxx_hrof', dataptr1, rc=rc)
           if (ChkErr(rc,__LINE__,u_FILE_u)) return

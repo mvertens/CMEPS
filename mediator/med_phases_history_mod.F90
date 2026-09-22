@@ -662,7 +662,10 @@ contains
           if (ChkErr(rc,__LINE__,u_FILE_u)) return
        end if
 
-       if (present(fldbun_import)) then
+       if (present(fldbun_import) .and. present(fldbun_export)) then
+          call shr_log_error(subname//'fldbun_import and fldbun_export cannot both be present as arguments', rc=rc)
+          return
+       else if (present(fldbun_import)) then
           ! import field bundle
           call med_io_write(io_file, fldbun_import, whead(m), wdata(m), &
                is_local%wrap%nx(comp_import), is_local%wrap%ny(comp_import), &
@@ -677,13 +680,8 @@ contains
              if (ChkErr(rc,__LINE__,u_FILE_u)) return
           end do
        else
-          if (present(fldbun_import) .and. present(fldbun_export)) then
-             call shr_log_error(subname//'fldbun_import and fldbun_export cannot both be present as arguments', rc=rc)
-             return
-          else
-             call shr_log_error(subname//'either fldbun_import or fldbun_export must be present as arguments', rc=rc)
-             return
-          end if
+          call shr_log_error(subname//'either fldbun_import or fldbun_export must be present as arguments', rc=rc)
+          return
        end if
 
     end do ! end of loop over m
