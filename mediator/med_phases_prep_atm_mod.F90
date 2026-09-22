@@ -8,7 +8,7 @@ module med_phases_prep_atm_mod
   use NUOPC                 , only : NUOPC_CompAttributeGet
   use ESMF                  , only : ESMF_LogWrite, ESMF_LOGMSG_INFO, ESMF_SUCCESS
   use ESMF                  , only : ESMF_Field, ESMF_FieldGet, ESMF_FieldBundleGet
-  use ESMF                  , only : ESMF_GridComp, ESMF_GridCompGet
+  use ESMF                  , only : ESMF_GridComp
   use med_constants_mod     , only : dbug_flag   => med_constants_dbug_flag
   use med_utils_mod         , only : memcheck    => med_memcheck
   use med_utils_mod         , only : chkerr      => med_utils_ChkErr
@@ -306,8 +306,6 @@ contains
     ! 'Foxx_evap','Foxx_hevap','Foxx_hcond','Foxx_rofl',
     ! 'Foxx_hrofl','Foxx_rofi','Foxx_hrofi','Foxx_rofl_glc',
     ! 'Foxx_hrofl_glc','Foxx_rofi_glc','Foxx_hrofi_glc'
-    ! The result is added as a correction to the sensible heat flux sent back to the atm
-    ! in subroutine med_phases_prep_atm
 
     ! input/output variables
     type(ESMF_GridComp) , intent(in)  :: gcomp
