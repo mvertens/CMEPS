@@ -39,10 +39,6 @@
     <type>char</type>
     <valid_values>cesm,noresm</valid_values>
     <default_value>cesm</default_value>
-    <values>
-      <value cime_model="cesm">cesm</value>
-      <value cime_model="noresm">noresm</value>
-    </values>
     <group>run_coupling</group>
     <file>env_run.xml</file>
     <desc>coupling mode</desc>
@@ -1109,6 +1105,21 @@
     <group>mach_pes_last</group>
     <file>env_mach_pes.xml</file>
     <desc>pes or cores used relative to MAX_MPITASKS_PER_NODE for accounting (0 means TOTALPES is valid)</desc>
+  </entry>
+
+  <entry id="BFBFLAG">
+    <type>logical</type>
+    <valid_values>TRUE,FALSE</valid_values>
+    <default_value>FALSE</default_value>
+    <group>run_flags</group>
+    <file>env_run.xml</file>
+    <desc>
+      If TRUE, perform some calculations (in CMEPS and elsewhere) such as global sums
+      using a less efficient algorithm that is independent of processor count. This allows
+      for Bit-For-Bit (BFB) reproducibility when changing PE layouts, for many compsets.
+      However, setting this flag does NOT guarantee that all calculations throughout all
+      model configurations are BFB independent of processor count.
+    </desc>
   </entry>
 
   <!-- ===================================================================== -->
@@ -2499,7 +2510,6 @@
    <default_value></default_value>
    <values>
      <value cime_model="cesm">gptl,pio,csm_share,FTorch,CDEPS</value>
-     <value cime_model="noresm">gptl,pio,csm_share,FTorch,CDEPS</value>
    </values>
    <group>build_def</group>
    <file>env_build.xml</file>
@@ -2519,20 +2529,6 @@
    <file>env_run.xml</file>
    <desc>add aoflux calculation to runseq</desc>
  </entry>
-
-  <!-- ===================================================================== -->
-  <!-- TODO: the following should be deleted. They are still used by  -->
-  <!-- the component testing but are not doing anything in cmeps -->
-  <!-- ===================================================================== -->
-
-  <entry id="BFBFLAG">
-    <type>logical</type>
-    <valid_values>TRUE,FALSE</valid_values>
-    <default_value>FALSE</default_value>
-    <group>run_flags</group>
-    <file>env_run.xml</file>
-    <desc>does not do anything currently in CMEPS</desc>
-  </entry>
 
  <help>
     =========================================
