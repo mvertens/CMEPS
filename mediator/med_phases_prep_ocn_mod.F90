@@ -13,6 +13,7 @@ module med_phases_prep_ocn_mod
   use med_map_mod           , only : med_map_field_packed
   use med_utils_mod         , only : memcheck      => med_memcheck
   use med_utils_mod         , only : chkerr        => med_utils_ChkErr
+  use med_global_sums_mod   , only : med_global_sums
   use med_methods_mod       , only : FB_diagnose   => med_methods_FB_diagnose
   use med_methods_mod       , only : FB_fldchk     => med_methods_FB_FldChk
   use med_methods_mod       , only : FB_GetFldPtr  => med_methods_FB_GetFldPtr
@@ -826,9 +827,6 @@ contains
   !-----------------------------------------------------------------------------
   subroutine med_oa_integral (gcomp, local_array, global_integral, rc)
 
-    use ESMF , only : ESMF_VMAllreduce, ESMF_GridComp, ESMF_GridCompGet, ESMF_REDUCE_SUM, ESMF_SUCCESS
-    use ESMF , only : ESMF_VM
-
     ! input/output variables
     type(ESMF_GridComp) , intent(in)  :: gcomp
     real(r8)            , intent(in)  :: local_array(:)
@@ -839,7 +837,6 @@ contains
     type(InternalState) :: is_local
     integer             :: n
     real(r8)            :: local_sum(1)
-    type(ESMF_VM)       :: vm
     !---------------------------------------
 
     rc = ESMF_SUCCESS
@@ -847,16 +844,16 @@ contains
     nullify(is_local%wrap)
     call ESMF_GridCompGetInternalState(gcomp, is_local, rc)
     if (chkErr(rc,__LINE__,u_FILE_u)) return
+
     ! sum contributions to integral
     local_sum(1) = 0._r8
     do n = 1,size(local_array)
        local_sum(1) = local_sum(1) + local_array(n)
     end do
-    call ESMF_GridCompGet(gcomp, vm=vm, rc=rc)
+
+    call med_global_sums(gcomp, local_sum, global_integral(1), rc)
     if (ChkErr(rc,__LINE__,u_FILE_u)) return
-    call ESMF_VMAllreduce(vm, senddata=local_sum, recvdata=global_integral, count=1, &
-         reduceflag=ESMF_REDUCE_SUM, rc=rc)
-    if (ChkErr(rc,__LINE__,u_FILE_u)) return
+
   end subroutine med_oa_integral
 
 end module med_phases_prep_ocn_mod

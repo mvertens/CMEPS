@@ -1019,7 +1019,9 @@
     <group>MED_attributes</group>
     <valid_values>v0,v1,v2</valid_values>
     <desc>
-      currently v0 refers to budgets using BLOM and v1 refers to budgets using MOM6
+      v0 refers to budgets using BLOM in NorESM3 configurations
+      v1 refers to budgets using MOM6 in CESM3 configurations
+      v2 refers to budgets using BLOM in post NorESM3 configurations where CAM computes enthalpy
     </desc>
     <values>
       <value>v0</value>
@@ -1766,7 +1768,6 @@
     </values>
   </entry>
 
-  <!-- MED histaux lnd2med file 1 - all fields from land with instantaneous output-->
   <entry id="histaux_lnd2med_file1_enabled">
     <type>logical</type>
     <category>aux_hist</category>
@@ -1831,12 +1832,11 @@
     </values>
   </entry>
 
-  <!-- MED histaux lnd2med file 1 - all fields from land with instantaneous output-->
   <entry id="histaux_lnd2med_file2_enabled">
     <type>logical</type>
     <category>aux_hist</category>
     <group>MED_attributes</group>
-    <desc>Auxiliary mediator l2x fields every lnd coupling interval</desc>
+    <desc>Auxiliary mediator l2x rof fields averaged over the day</desc>
     <values>
       <value>.false.</value>
     </values>
@@ -1845,7 +1845,7 @@
     <type>char</type>
     <category>aux_hist</category>
     <group>MED_attributes</group>
-    <desc>Auxiliary mediator lnd2med output every lnd coupling interval</desc>
+    <desc>Auxiliary mediator l2x rof fields averaged over the day</desc>
     <!-- Note that in med_phases_history_mod already drops requested aux-history fields that aren't connected -->
     <!-- When CLM isn't sending non-water tracers it's never in -->
     <!-- FBImp(complnd,complnd), so the history filter drops it and the aux -->

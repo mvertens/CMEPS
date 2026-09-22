@@ -713,6 +713,8 @@ contains
           end do
 
           ! Write import auxiliary file for ocn if appropriate
+          ! Note that although this config variable contains the l2x string - it is also used to trigger
+          ! in ocn input data that is destined for glc
           if (write_histaux_l2x1yrg) then
              call med_phases_history_write_data2glc(gcomp, fldbun_import=FBocnAccum2glc_o, comp_import=compocn, rc=rc)
              if (ChkErr(rc,__LINE__,u_FILE_u)) return

@@ -5,12 +5,14 @@ module med_phases_prep_atm_mod
   !-----------------------------------------------------------------------------
 
   use med_kind_mod          , only : CX=>SHR_KIND_CX, CS=>SHR_KIND_CS, CL=>SHR_KIND_CL, R8=>SHR_KIND_R8
+  use NUOPC                 , only : NUOPC_CompAttributeGet
   use ESMF                  , only : ESMF_LogWrite, ESMF_LOGMSG_INFO, ESMF_SUCCESS
   use ESMF                  , only : ESMF_Field, ESMF_FieldGet, ESMF_FieldBundleGet
   use ESMF                  , only : ESMF_GridComp, ESMF_GridCompGet
   use med_constants_mod     , only : dbug_flag   => med_constants_dbug_flag
   use med_utils_mod         , only : memcheck    => med_memcheck
   use med_utils_mod         , only : chkerr      => med_utils_ChkErr
+  use med_global_sums_mod   , only : med_global_sums
   use med_methods_mod       , only : FB_diagnose => med_methods_FB_diagnose
   use med_methods_mod       , only : FB_fldchk   => med_methods_FB_FldChk
   use med_methods_mod       , only : FB_getfldptr=> med_methods_FB_GetFldPtr
@@ -32,6 +34,8 @@ module med_phases_prep_atm_mod
   public :: med_phases_prep_atm
   public :: med_phases_prep_atm_enthalpy_correction
   public :: med_phases_prep_atm_enthalpy_runoff
+
+  character(len=CS) :: component_computes_enthalpy_flux = 'unset'
 
   real(r8) :: global_htot_corr(1) = 0._r8  ! enthalpy correction from med_phases_prep_ocn
   real(r8) :: global_hrof_corr(1) = 0._r8  ! enthalpy of run-off from med_phases_prep_ocn
@@ -60,6 +64,8 @@ contains
     real(R8), pointer          :: ifrac(:)
     real(R8), pointer          :: ofrac(:)
     integer                    :: n,nf
+    character(len=CL)          :: cvalue
+    logical                    :: isPresent, IsSet
     type(med_fldlist_type), pointer :: fldList
     character(len=*),parameter :: subname='(med_phases_prep_atm)'
     !-------------------------------------------------------------------------------
@@ -235,24 +241,42 @@ contains
       end if
     end do
 
+    ! Determine component_computes_enthalpy if it is unset
+    if (component_computes_enthalpy_flux == 'unset') then
+       call NUOPC_CompAttributeGet(gcomp, name="component_computes_enthalpy_flux", value=cvalue, &
+            isPresent=isPresent, isSet=isSet, rc=rc)
+       if (chkerr(rc,__LINE__,u_FILE_u)) return
+       if (isPresent .and. isSet) then
+          component_computes_enthalpy_flux = trim(cvalue)
+       else
+          component_computes_enthalpy_flux = 'none'
+       end if
+    end if
+
     ! Only do the following correction if the mediator is computing the enthalpy to be sent to the ocean
     ! from rain, snow, etc.
-    if (       FB_FldChk(is_local%wrap%FBExp(compatm), 'Faxx_sen' , rc=rc) .and. &
-         .not. FB_fldchk(is_local%wrap%FBExp(compocn), 'Faxa_hmat', rc=rc)) then
-       call FB_getfldptr(is_local%wrap%FBExp(compatm), 'Faxx_sen', dataptr1, rc=rc)
-       if (ChkErr(rc,__LINE__,u_FILE_u)) return
-       do n = 1,size(dataptr1)
-          dataptr1(n) = dataptr1(n) + global_htot_corr(1)
-       end do
+    ! Note that global_htot_corr(1) is preset to zero as a module variable - and will only be set differently
+    ! if med_phases_prep_atm_enthalpy_correction is called in component_computes_enthalpy_flux == 'med'
+    if (trim(component_computes_enthalpy_flux) /= 'med') then
+       if ( FB_FldChk(is_local%wrap%FBExp(compatm), 'Faxx_sen' , rc=rc)) then
+          call FB_getfldptr(is_local%wrap%FBExp(compatm), 'Faxx_sen', dataptr1, rc=rc)
+          if (ChkErr(rc,__LINE__,u_FILE_u)) return
+          do n = 1,size(dataptr1)
+             dataptr1(n) = dataptr1(n) + global_htot_corr(1)
+          end do
+       end if
     end if
+
     ! Only do the following if the atmosphere is computing the enthalpy to be sent to the ocean
     ! from rain, snow, etc.
-    if (FB_FldChk(is_local%wrap%FBExp(compatm), 'Faxx_hrof', rc=rc)) then
-       call FB_getfldptr(is_local%wrap%FBExp(compatm), 'Faxx_hrof', dataptr1, rc=rc)
-       if (ChkErr(rc,__LINE__,u_FILE_u)) return
-       do n = 1,size(dataptr1)
-          dataptr1(n) = global_hrof_corr(1)
-       end do
+    if (trim(component_computes_enthalpy_flux) /= 'atm') then
+       if (FB_FldChk(is_local%wrap%FBExp(compatm), 'Faxx_hrof', rc=rc)) then
+          call FB_getfldptr(is_local%wrap%FBExp(compatm), 'Faxx_hrof', dataptr1, rc=rc)
+          if (ChkErr(rc,__LINE__,u_FILE_u)) return
+          do n = 1,size(dataptr1)
+             dataptr1(n) = global_hrof_corr(1)
+          end do
+       end if
     end if
 
     ! Check for nans in fields export to atm
@@ -285,9 +309,6 @@ contains
     ! The result is added as a correction to the sensible heat flux sent back to the atm
     ! in subroutine med_phases_prep_atm
 
-    use ESMF            , only : ESMF_VMAllreduce, ESMF_GridCompGet, ESMF_REDUCE_SUM
-    use ESMF            , only : ESMF_VM
-
     ! input/output variables
     type(ESMF_GridComp) , intent(in)  :: gcomp
     real(r8)            , intent(in)  :: hcorr(:)
@@ -295,9 +316,6 @@ contains
 
     ! local variables
     type(InternalState) :: is_local
-    integer             :: n
-    real(r8)            :: local_htot_corr(1)
-    type(ESMF_VM)       :: vm
     !---------------------------------------
 
     rc = ESMF_SUCCESS
@@ -306,24 +324,13 @@ contains
     call ESMF_GridCompGetInternalState(gcomp, is_local, rc)
     if (chkErr(rc,__LINE__,u_FILE_u)) return
 
-    ! Determine sum of enthalpy correction for each hcorr index locally
-    local_htot_corr(1) = 0._r8
-    do n = 1,size(hcorr)
-       local_htot_corr(1) = local_htot_corr(1) + hcorr(n)
-    end do
-    call ESMF_GridCompGet(gcomp, vm=vm, rc=rc)
-    if (ChkErr(rc,__LINE__,u_FILE_u)) return
-    call ESMF_VMAllreduce(vm, senddata=local_htot_corr, recvdata=global_htot_corr, count=1, &
-         reduceflag=ESMF_REDUCE_SUM, rc=rc)
+    call med_global_sums(gcomp, hcorr, global_htot_corr(1), rc)
     if (ChkErr(rc,__LINE__,u_FILE_u)) return
 
   end subroutine med_phases_prep_atm_enthalpy_correction
 
   !-----------------------------------------------------------------------------
   subroutine med_phases_prep_atm_enthalpy_runoff(gcomp, hcorr, rc)
-
-    use ESMF , only : ESMF_VMAllreduce, ESMF_GridCompGet, ESMF_REDUCE_SUM
-    use ESMF , only : ESMF_VM
 
     ! Enthalpy of runoff calculated called by med_phases_prep_ocn_accum in
     ! med_phases_prep_ocn_mod
@@ -338,9 +345,6 @@ contains
 
     ! local variables
     type(InternalState) :: is_local
-    integer             :: n
-    real(r8)            :: local_hrof_corr(1)
-    type(ESMF_VM)       :: vm
     !---------------------------------------
 
     rc = ESMF_SUCCESS
@@ -349,15 +353,7 @@ contains
     call ESMF_GridCompGetInternalState(gcomp, is_local, rc)
     if (chkErr(rc,__LINE__,u_FILE_u)) return
 
-    ! Determine sum of enthalpy correction for each hcorr index locally
-    local_hrof_corr(1) = 0._r8
-    do n = 1,size(hcorr)
-       local_hrof_corr(1) = local_hrof_corr(1) + hcorr(n)
-    end do
-    call ESMF_GridCompGet(gcomp, vm=vm, rc=rc)
-    if (ChkErr(rc,__LINE__,u_FILE_u)) return
-    call ESMF_VMAllreduce(vm, senddata=local_hrof_corr, recvdata=global_hrof_corr, count=1, &
-         reduceflag=ESMF_REDUCE_SUM, rc=rc)
+    call med_global_sums(gcomp, hcorr, global_hrof_corr(1), rc)
     if (ChkErr(rc,__LINE__,u_FILE_u)) return
 
   end subroutine med_phases_prep_atm_enthalpy_runoff

@@ -765,6 +765,8 @@ contains
     real(r8)               , intent(in)    :: ofrac(:)
     real(r8)               , intent(in)    :: ifrac(:)
     real(r8)               , intent(inout) :: budget(:,:,:)
+    ! Note - if component_contribution is .true. then compute the individual ocn, lnd and ice
+    ! contributions to the budget term
     logical                , intent(in)    :: component_contribution
     integer                , intent(out)   :: rc
     ! local variables
