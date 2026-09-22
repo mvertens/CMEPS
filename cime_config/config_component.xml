@@ -41,7 +41,7 @@
     <default_value>cesm</default_value>
     <values>
       <value cime_model="cesm">cesm</value>
-      <value cime_model="noresm">cesm</value>
+      <value cime_model="noresm">noresm</value>
     </values>
     <group>run_coupling</group>
     <file>env_run.xml</file>

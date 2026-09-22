@@ -1846,8 +1846,13 @@
     <category>aux_hist</category>
     <group>MED_attributes</group>
     <desc>Auxiliary mediator lnd2med output every lnd coupling interval</desc>
+    <!-- Note that in med_phases_history_mod already drops requested aux-history fields that aren't connected -->
+    <!-- When CLM isn't sending non-water tracers it's never in -->
+    <!-- FBImp(complnd,complnd), so the history filter drops it and the aux -->
+    <!-- file just carries the four water fields. -->
     <values>
       <value>'Flrl_rofsur:Flrl_rofi:Flrl_rofgwl:Flrl_rofsub'</value>
+      <value coupling_mode="noresm">'Flrl_rofsur:Flrl_rofi:Flrl_rofgwl:Flrl_rofsub:Flrl_rofsur_nonh2o'</value>
     </values>
   </entry>
   <entry id="histaux_lnd2med_file2_history_option">
