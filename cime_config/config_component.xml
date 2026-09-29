@@ -561,6 +561,30 @@
     If TRUE, short term archiving will be turned on.</desc>
   </entry>
 
+  <entry id="DOUT_S_AGGREGATE">
+    <type>logical</type>
+    <valid_values>TRUE,FALSE</valid_values>
+    <default_value>FALSE</default_value>
+    <group>run_data_archive</group>
+    <file>env_run.xml</file>
+    <desc>Logical to turn on concatenation of archived history files.
+    If TRUE, the short term archiver's aggregation step combines the history
+    files of each completed year into a single file per year, greatly reducing
+    the number of files.  The year currently being written is left alone, and
+    the files of a year are removed only after the record count of the combined
+    file has been verified against them.</desc>
+  </entry>
+
+  <entry id="DOUT_S_AGGREGATE_STREAMS">
+    <type>char</type>
+    <default_value>cice.h1 mosart.h0a</default_value>
+    <group>run_data_archive</group>
+    <file>env_run.xml</file>
+    <desc>Space separated list of history streams to concatenate when
+    DOUT_S_AGGREGATE is TRUE, given as component.stream, e.g. "cice.h1
+    mosart.h0a".  Each stream must use an unlimited time dimension.</desc>
+  </entry>
+
   <entry id="RUN_POSTPROCESSING">
     <type>logical</type>
     <valid_values>TRUE,FALSE</valid_values>
