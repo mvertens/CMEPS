@@ -577,7 +577,7 @@
 
   <entry id="DOUT_S_AGGREGATE_STREAMS">
     <type>char</type>
-    <default_value>cice.h1:365 mosart.h0a:12</default_value>
+    <default_value>cice.h1:365 cice.h2_inst:365 mosart.h0a:12</default_value>
     <group>run_data_archive</group>
     <file>env_run.xml</file>
     <desc>Space separated list of history streams to concatenate when
