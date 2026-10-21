@@ -561,6 +561,29 @@
     If TRUE, short term archiving will be turned on.</desc>
   </entry>
 
+  <entry id="DOUT_S_COMPRESS">
+    <type>logical</type>
+    <valid_values>TRUE,FALSE</valid_values>
+    <default_value>TRUE</default_value>
+    <group>run_data_archive</group>
+    <file>env_run.xml</file>
+    <desc>Logical to turn on compression of archived history files.</desc>
+  </entry>
+
+  <entry id="DOUT_S_COMPRESS_LEVEL">
+    <type>integer</type>
+    <default_value>5</default_value>
+o    <group>run_data_archive</group>
+    <file>env_run.xml</file>
+    <desc>If compression is on, then compression level passed to ncks -L
+    when rewriting each history file as netCDF-4.  1 is fastest and 
+    compresses least, 9 is slowest and compresses most. For floating
+    point model output the gain above about 4 is small while the cost
+    keeps rising, so 5 is a deliberate middle choice rather than a
+    default. Raising it makes this job noticeably longer for a few
+    percent of space.</desc>
+  </entry>
+
   <entry id="DOUT_S_AGGREGATE">
     <type>logical</type>
     <valid_values>TRUE,FALSE</valid_values>
@@ -577,7 +600,7 @@
 
   <entry id="DOUT_S_AGGREGATE_STREAMS">
     <type>char</type>
-    <default_value>cice.h1:daily cice.h2_inst:daily mosart.h0a:monthly</default_value>
+    <default_value>cice.h1:365 cice.h2_inst:12 mosart.h0a:12</default_value>
     <group>run_data_archive</group>
     <file>env_run.xml</file>
     <desc>Space separated list of history streams to concatenate to a
