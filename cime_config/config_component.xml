@@ -572,8 +572,9 @@
 
   <entry id="DOUT_S_COMPRESS_LEVEL">
     <type>integer</type>
+    <valid_values>1,2,3,4,5,6,7,8,9</valid_values>
     <default_value>5</default_value>
-o    <group>run_data_archive</group>
+    <group>run_data_archive</group>
     <file>env_run.xml</file>
     <desc>If compression is on, then compression level passed to ncks -L
     when rewriting each history file as netCDF-4.  1 is fastest and 
